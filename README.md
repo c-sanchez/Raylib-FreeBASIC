@@ -104,3 +104,106 @@ converter.exe raygui.h raygui.bi
 * **WinLibs GCC:** https://winlibs.com/
 * **Raylib Releases:** https://github.com/raysan5/raylib/releases
 * **Raygui Releases:** https://github.com/raysan5/raygui/releases
+
+---
+
+## 🇪🇸 Español
+
+Esta herramienta es un analizador sintáctico (parser) y sistema de compilación escrito en FreeBASIC que convierte automáticamente las cabeceras oficiales en C de **Raylib** y **Raygui** en cabeceras compatibles con FreeBASIC (archivos `.bi`) y compila las librerías estáticas necesarias.
+
+Crea un puente perfecto entre ambos lenguajes al generar cabeceras y bibliotecas nativas, permitiéndote usar `raylib`, `raymath`, `rlgl` y `raygui` directamente en tus proyectos de FreeBASIC, tanto para arquitecturas x86 (32-bit) como x64 (64-bit).
+
+### ✨ Características
+
+*   **Soporte Completo de Módulos:** Convierte totalmente los cuatro módulos principales:
+    *   `raylib.h` (API Principal)
+    *   `raymath.h` (Matemáticas de vectores/matrices)
+    *   `rlgl.h` (Abstracción de OpenGL)
+    *   `raygui.h` (API de GUI en modo inmediato)
+*   **Mapeo Inteligente de Tipos:** Asigna automáticamente tipos de C a sus equivalentes en FreeBASIC (ej. `int` $\to$ `long`, `const char*` $\to$ `zstring ptr`).
+*   **Análisis de Structs y Enums:** Traduce correctamente los structs y enums de C en bloques `Type` y `Enum` de FreeBASIC.
+*   **Correcciones de Sintaxis:** Maneja conflictos de nombres automáticamente (ej. renombrar el struct `Color` de C a `RayColor` para evitar conflictos con las palabras reservadas de FreeBASIC).
+*   **Compilación de Librerías Estáticas:** Compila automáticamente librerías C "header-only" (como Raygui) en librerías estáticas `.a` listas para usar.
+
+### ⚙️ Cómo funciona
+
+El convertidor escanea los archivos de cabecera en C originales línea por línea, comprendiendo su contexto para:
+1.  Identificar versiones automáticamente.
+2.  Filtrar macros específicas de C que no son necesarias en FB.
+3.  Analizar firmas de funciones (manejando `RLAPI`, `RMAPI` y `RAYGUIAPI`).
+4.  Omitir implementaciones de C en línea (específicamente en `raymath.h` y `raygui.h`) para generar declaraciones `Declare` limpias.
+5.  Añadir código base necesario (como `#inclib`, `extern "C"`, dependencias CRT y dependencias del sistema Windows).
+
+### ⚠️ Requisitos y Prerrequisitos
+
+Para compilar las implementaciones en C (como Raygui) y garantizar la compatibilidad con el enlazador (linker) interno de FreeBASIC, **debes** usar versiones de GCC compiladas con **MSVCRT** (no UCRT).
+
+1. **Compiladores MinGW (WinLibs):**
+   * 32-bit: `winlibs-i686-posix-dwarf-gcc-11.5.0-mingw-w64msvcrt-12.0.0-r1`
+   * 64-bit: `winlibs-x86_64-posix-seh-gcc-11.5.0-mingw-w64msvcrt-12.0.0-r1`
+   * *(Nota: GCC 8.5 con MSVCRT también es muy recomendado para máxima compatibilidad).*
+2. **Librerías Estáticas de Raylib (`libraylib.a`):**
+   * Descarga las *releases* oficiales de Raylib para MinGW.
+   * Coloca el `libraylib.a` de 64-bit (de `raylib-x.x_win64_mingw-w64`) en la carpeta `lib_c\x64`.
+   * Coloca el `libraylib.a` de 32-bit (de `raylib-x.x_win32_mingw-w64`) en la carpeta `lib_c\x86`.
+3. **Cabecera de Raygui (`raygui.h`):**
+   * Descarga la *release* oficial de Raygui (`raygui-x.x.zip`).
+   * Extrae `raygui.h` y colócalo en la carpeta `src_c`.
+
+### 💻 Configuración del Entorno
+
+Para automatizar la compilación en ambas arquitecturas y mantener los compiladores organizados en tu equipo, este sistema espera la siguiente estructura de carpetas en tu disco `C:\`:
+
+```text
+C:\dev\
+ ├── cmd\        (Agrega esta carpeta al PATH del sistema)
+ ├── mingw32\    (Extrae aquí el WinLibs MSVCRT de 32-bit)
+ └── mingw64\    (Extrae aquí el WinLibs MSVCRT de 64-bit)
+```
+
+Dentro de la carpeta `C:\dev\cmd`, crea los siguientes archivos `.bat` para llamar fácilmente a los compiladores:
+
+**gcc32.bat** y **ar32.bat**:
+```batch
+@echo off
+setlocal
+set PATH=C:\dev\mingw32\bin;%PATH%
+gcc.exe %*    :: (Usa ar.exe %* para ar32.bat)
+endlocal
+```
+**gcc64.bat** y **ar64.bat**:
+```batch
+@echo off
+setlocal
+set PATH=C:\dev\mingw64\bin;%PATH%
+gcc.exe %*    :: (Usa ar.exe %* para ar64.bat)
+endlocal
+```
+
+### 🚀 Instrucciones Paso a Paso
+
+1. **Obtener las Cabeceras:** Consigue los archivos `raylib.h`, `raymath.h`, `rlgl.h` y `raygui.h`.
+2. **Limpiar Cabeceras:** Elimina los comentarios de los archivos `.h`. Puedes hacerlo automáticamente usando la herramienta `remove_comments_h.bas` de la carpeta `tools`.
+3. **Colocar Archivos:** Coloca todas las cabeceras `.h` limpias en la carpeta `src_c`.
+4. **Generar Cabeceras para FreeBASIC:** Ejecuta `gen-raylib_headers.bat` (en la carpeta `_build_scripts`). Esto analizará las cabeceras de C y generará los archivos `.bi`.
+5. **Compilar Librerías de Raygui:** Ejecuta `build-raygui_lib.bat` (en la carpeta `_build_scripts`). Esto compilará `raygui.h` en librerías estáticas (`libraygui.a`) tanto para x86 como para x64.
+
+Si hiciste todo correctamente, tendrás un SDK de FreeBASIC completo y listo para usar, tanto para x64 como para x86. Puedes ver los archivos generados (`.bi` y `.a`) en la carpeta `sdk_freebasic`.
+
+### 🛠️ Uso manual del CLI (Convertidor)
+
+Si deseas utilizar la herramienta de conversión de FreeBASIC manualmente:
+
+```bash
+# Sintaxis
+converter.exe <archivo_entrada.h> <archivo_salida.bi>
+
+# Ejemplos
+converter.exe raylib.h raylib.bi
+converter.exe raygui.h raygui.bi
+```
+
+### 🔗 Enlaces
+* **WinLibs GCC:** https://winlibs.com/
+* **Raylib Releases:** https://github.com/raysan5/raylib/releases
+* **Raygui Releases:** https://github.com/raysan5/raygui/releases
