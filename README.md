@@ -1,6 +1,6 @@
 # Raylib & Raygui Converter for FreeBASIC
 
-[es Leer versión en Español](#español) | [us Read English version](#english)
+[[us Read English version](#english) | es Leer versión en Español](#spanish)
 
 ---
 
@@ -107,7 +107,7 @@ converter.exe raygui.h raygui.bi
 
 ---
 
-## 🇪🇸 Español
+## 🇪🇸 Spanish
 
 Esta herramienta es un analizador sintáctico (parser) y sistema de compilación escrito en FreeBASIC que convierte automáticamente las cabeceras oficiales en C de **Raylib** y **Raygui** en cabeceras compatibles con FreeBASIC (archivos `.bi`) y compila las librerías estáticas necesarias.
 
