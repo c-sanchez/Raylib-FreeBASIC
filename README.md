@@ -1,10 +1,10 @@
 # Raylib & Raygui Converter for FreeBASIC
 
-[🇬🇧 Read English version](#english) | [🇪🇸 Leer versión en Español](#spanish)
+[us Read English version](#english) | [🇪🇸 Leer versión en Español](#spanish)
 
 ---
 
-## <a id="english"></a>🇬🇧 English
+## <a id="english"></a>us English
 
 This tool is a specialized parser and build system written in FreeBASIC that automatically converts the official **Raylib** and **Raygui** C headers into FreeBASIC compatible headers (`.bi` files) and compiles the necessary static libraries.
 
@@ -60,20 +60,39 @@ C:\dev\
 
 Inside the `C:\dev\cmd` folder, create the following wrapper `.bat` files to easily call the compilers:
 
-**gcc32.bat** & **ar32.bat**:
+**gcc32.bat**:
 ```batch
 @echo off
 setlocal
 set PATH=C:\dev\mingw32\bin;%PATH%
-gcc.exe %*    :: (Use ar.exe %* for ar32.bat)
+gcc.exe %*
 endlocal
 ```
-**gcc64.bat** & **ar64.bat**:
+
+**ar32.bat**:
+```batch
+@echo off
+setlocal
+set PATH=C:\dev\mingw32\bin;%PATH%
+ar.exe %*
+endlocal
+```
+
+**gcc64.bat**:
 ```batch
 @echo off
 setlocal
 set PATH=C:\dev\mingw64\bin;%PATH%
-gcc.exe %*    :: (Use ar.exe %* for ar64.bat)
+gcc.exe %*
+endlocal
+```
+
+**ar64.bat**:
+```batch
+@echo off
+setlocal
+set PATH=C:\dev\mingw64\bin;%PATH%
+ar.exe %*
 endlocal
 ```
 
@@ -163,20 +182,39 @@ C:\dev\
 
 Dentro de la carpeta `C:\dev\cmd`, crea los siguientes archivos `.bat` para llamar fácilmente a los compiladores:
 
-**gcc32.bat** y **ar32.bat**:
+**gcc32.bat**:
 ```batch
 @echo off
 setlocal
 set PATH=C:\dev\mingw32\bin;%PATH%
-gcc.exe %*    :: (Usa ar.exe %* para ar32.bat)
+gcc.exe %*
 endlocal
 ```
-**gcc64.bat** y **ar64.bat**:
+
+**ar32.bat**:
+```batch
+@echo off
+setlocal
+set PATH=C:\dev\mingw32\bin;%PATH%
+ar.exe %*
+endlocal
+```
+
+**gcc64.bat**:
 ```batch
 @echo off
 setlocal
 set PATH=C:\dev\mingw64\bin;%PATH%
-gcc.exe %*    :: (Usa ar.exe %* para ar64.bat)
+gcc.exe %*
+endlocal
+```
+
+**ar64.bat**:
+```batch
+@echo off
+setlocal
+set PATH=C:\dev\mingw64\bin;%PATH%
+ar.exe %*
 endlocal
 ```
 
