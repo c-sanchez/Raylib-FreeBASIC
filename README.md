@@ -1,6 +1,6 @@
 # Raylib & Raygui Converter for FreeBASIC
 
-[[us Read English version](#english) | es Leer versión en Español](#spanish)
+[[us Read English version](#english)   | [es Leer versión en Español](#spanish)
 
 ---
 
