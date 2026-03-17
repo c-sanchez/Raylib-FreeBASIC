@@ -1,10 +1,10 @@
 # Raylib & Raygui Converter for FreeBASIC
 
-[🇪🇸 Leer versión en Español](#español) | [🇬🇧 Read English version](#english)
+[es Leer versión en Español](#español) | [us Read English version](#english)
 
 ---
 
-## 🇬🇧 English
+## us English
 
 This tool is a specialized parser and build system written in FreeBASIC that automatically converts the official **Raylib** and **Raygui** C headers into FreeBASIC compatible headers (`.bi` files) and compiles the necessary static libraries.
 
