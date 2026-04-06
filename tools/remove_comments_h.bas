@@ -1,13 +1,12 @@
-﻿#include "crt.bi"
-#include "dir.bi"
+﻿#include "dir.bi"
 #include "file.bi"
 
 Dim As String fileName
 Dim As String fileList()
 Dim As Integer fileCount = 0
 Dim As Integer i, fhIn, fhOut, charIndex
-Dim As String inputLine, outputLine
-Dim As Boolean inMultilineComment, lastLineWasEmpty
+Dim As String inputLine, outputLine, ch, ch2
+Dim As Boolean inMultilineComment, inString, lastLineWasEmpty
 
 If Dir("original", fbDirectory) = "" Then
   MkDir "original"
@@ -46,6 +45,7 @@ For i = 1 To fileCount
   End If
 
   inMultilineComment = False
+  inString = False
   lastLineWasEmpty = False
 
   While Not EOF(fhIn)
@@ -62,28 +62,51 @@ For i = 1 To fileCount
 
     charIndex = 1
     While charIndex <= Len(inputLine)
-      If Mid(inputLine, charIndex, 2) = "/*" And Not inMultilineComment Then
+      ch  = Mid(inputLine, charIndex, 1)
+      ch2 = Mid(inputLine, charIndex, 2)
+
+      ' Inside a string: handle backslash escape so \" doesn't end the string
+      If inString And ch = "\" Then
+        outputLine += ch2
+        charIndex += 2
+        Continue While
+      End If
+
+      ' Toggle string literal tracking (only outside block comments)
+      If ch = Chr(34) And Not inMultilineComment Then
+        inString = Not inString
+        outputLine += ch
+        charIndex += 1
+        Continue While
+      End If
+
+      ' Start of block comment (only outside strings)
+      If ch2 = "/*" And Not inMultilineComment And Not inString Then
         inMultilineComment = True
         charIndex += 2
         Continue While
       End If
 
-      If Mid(inputLine, charIndex, 2) = "*/" And inMultilineComment Then
+      ' End of block comment
+      If ch2 = "*/" And inMultilineComment Then
         inMultilineComment = False
         charIndex += 2
         Continue While
       End If
 
-      If Mid(inputLine, charIndex, 2) = "//" And Not inMultilineComment Then
+      ' Line comment (only outside block comments and strings)
+      If ch2 = "//" And Not inMultilineComment And Not inString Then
         Exit While
       End If
 
       If Not inMultilineComment Then
-        outputLine += Mid(inputLine, charIndex, 1)
+        outputLine += ch
       End If
-
       charIndex += 1
     Wend
+
+    ' Strings do not span lines in C; reset state at end of each line
+    inString = False
 
     outputLine = RTrim(outputLine)
     If Len(outputLine) > 0 Then
@@ -96,6 +119,10 @@ For i = 1 To fileCount
       End If
     End If
   Wend
+
+  If inMultilineComment Then
+    Print "Warning: unclosed block comment in " & fileList(i)
+  End If
 
   Close #fhIn
   Close #fhOut
