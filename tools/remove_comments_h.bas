@@ -66,14 +66,14 @@ For i = 1 To fileCount
       ch2 = Mid(inputLine, charIndex, 2)
 
       ' Inside a string: handle backslash escape so \" doesn't end the string
-      If inString And ch = "\" Then
+      If inString And CBool(ch = "\") Then
         outputLine += ch2
         charIndex += 2
         Continue While
       End If
 
       ' Toggle string literal tracking (only outside block comments)
-      If ch = Chr(34) And Not inMultilineComment Then
+      If CBool(ch = Chr(34)) And Not inMultilineComment Then
         inString = Not inString
         outputLine += ch
         charIndex += 1
@@ -81,21 +81,21 @@ For i = 1 To fileCount
       End If
 
       ' Start of block comment (only outside strings)
-      If ch2 = "/*" And Not inMultilineComment And Not inString Then
+      If CBool(ch2 = "/*") And Not inMultilineComment And Not inString Then
         inMultilineComment = True
         charIndex += 2
         Continue While
       End If
 
       ' End of block comment
-      If ch2 = "*/" And inMultilineComment Then
+      If CBool(ch2 = "*/") And inMultilineComment Then
         inMultilineComment = False
         charIndex += 2
         Continue While
       End If
 
       ' Line comment (only outside block comments and strings)
-      If ch2 = "//" And Not inMultilineComment And Not inString Then
+      If CBool(ch2 = "//") And Not inMultilineComment And Not inString Then
         Exit While
       End If
 
