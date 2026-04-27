@@ -4,10 +4,10 @@
 
 #include <stdarg.h>
 
-#define RAYLIB_VERSION_MAJOR 5
-#define RAYLIB_VERSION_MINOR 5
+#define RAYLIB_VERSION_MAJOR 6
+#define RAYLIB_VERSION_MINOR 0
 #define RAYLIB_VERSION_PATCH 0
-#define RAYLIB_VERSION  "5.5"
+#define RAYLIB_VERSION  "6.0"
 
 #if defined(_WIN32)
     #if defined(__TINYC__)
@@ -228,12 +228,12 @@ typedef struct Mesh {
     unsigned char *colors;
     unsigned short *indices;
 
+    int boneCount;
+    unsigned char *boneIndices;
+    float *boneWeights;
+
     float *animVertices;
     float *animNormals;
-    unsigned char *boneIds;
-    float *boneWeights;
-    Matrix *boneMatrices;
-    int boneCount;
 
     unsigned int vaoId;
     unsigned int *vboId;
@@ -262,10 +262,18 @@ typedef struct Transform {
     Vector3 scale;
 } Transform;
 
+typedef Transform *ModelAnimPose;
+
 typedef struct BoneInfo {
     char name[32];
     int parent;
 } BoneInfo;
+
+typedef struct ModelSkeleton {
+    int boneCount;
+    BoneInfo *bones;
+    ModelAnimPose bindPose;
+} ModelSkeleton;
 
 typedef struct Model {
     Matrix transform;
@@ -276,17 +284,18 @@ typedef struct Model {
     Material *materials;
     int *meshMaterial;
 
-    int boneCount;
-    BoneInfo *bones;
-    Transform *bindPose;
+    ModelSkeleton skeleton;
+
+    ModelAnimPose currentPose;
+    Matrix *boneMatrices;
 } Model;
 
 typedef struct ModelAnimation {
-    int boneCount;
-    int frameCount;
-    BoneInfo *bones;
-    Transform **framePoses;
     char name[32];
+
+    int boneCount;
+    int keyframeCount;
+    ModelAnimPose *keyframePoses;
 } ModelAnimation;
 
 typedef struct Ray {
@@ -364,7 +373,6 @@ typedef struct VrStereoConfig {
 } VrStereoConfig;
 
 typedef struct FilePathList {
-    unsigned int capacity;
     unsigned int count;
     char **paths;
 } FilePathList;
@@ -632,7 +640,8 @@ typedef enum {
     SHADER_LOC_MAP_BRDF,
     SHADER_LOC_VERTEX_BONEIDS,
     SHADER_LOC_VERTEX_BONEWEIGHTS,
-    SHADER_LOC_BONE_MATRICES
+    SHADER_LOC_MATRIX_BONETRANSFORMS,
+    SHADER_LOC_VERTEX_INSTANCETRANSFORM
 } ShaderLocationIndex;
 
 #define SHADER_LOC_MAP_DIFFUSE      SHADER_LOC_MAP_ALBEDO
@@ -647,6 +656,10 @@ typedef enum {
     SHADER_UNIFORM_IVEC2,
     SHADER_UNIFORM_IVEC3,
     SHADER_UNIFORM_IVEC4,
+    SHADER_UNIFORM_UINT,
+    SHADER_UNIFORM_UIVEC2,
+    SHADER_UNIFORM_UIVEC3,
+    SHADER_UNIFORM_UIVEC4,
     SHADER_UNIFORM_SAMPLER2D
 } ShaderUniformDataType;
 
@@ -762,7 +775,7 @@ typedef void (*TraceLogCallback)(int logLevel, const char *text, va_list args);
 typedef unsigned char *(*LoadFileDataCallback)(const char *fileName, int *dataSize);
 typedef bool (*SaveFileDataCallback)(const char *fileName, void *data, int dataSize);
 typedef char *(*LoadFileTextCallback)(const char *fileName);
-typedef bool (*SaveFileTextCallback)(const char *fileName, char *text);
+typedef bool (*SaveFileTextCallback)(const char *fileName, const char *text);
 
 #if defined(__cplusplus)
 extern "C" {
@@ -885,17 +898,13 @@ RLAPI void TakeScreenshot(const char *fileName);
 RLAPI void SetConfigFlags(unsigned int flags);
 RLAPI void OpenURL(const char *url);
 
-RLAPI void TraceLog(int logLevel, const char *text, ...);
 RLAPI void SetTraceLogLevel(int logLevel);
+RLAPI void TraceLog(int logLevel, const char *text, ...);
+RLAPI void SetTraceLogCallback(TraceLogCallback callback);
+
 RLAPI void *MemAlloc(unsigned int size);
 RLAPI void *MemRealloc(void *ptr, unsigned int size);
 RLAPI void MemFree(void *ptr);
-
-RLAPI void SetTraceLogCallback(TraceLogCallback callback);
-RLAPI void SetLoadFileDataCallback(LoadFileDataCallback callback);
-RLAPI void SetSaveFileDataCallback(SaveFileDataCallback callback);
-RLAPI void SetLoadFileTextCallback(LoadFileTextCallback callback);
-RLAPI void SetSaveFileTextCallback(SaveFileTextCallback callback);
 
 RLAPI unsigned char *LoadFileData(const char *fileName, int *dataSize);
 RLAPI void UnloadFileData(unsigned char *data);
@@ -903,12 +912,24 @@ RLAPI bool SaveFileData(const char *fileName, void *data, int dataSize);
 RLAPI bool ExportDataAsCode(const unsigned char *data, int dataSize, const char *fileName);
 RLAPI char *LoadFileText(const char *fileName);
 RLAPI void UnloadFileText(char *text);
-RLAPI bool SaveFileText(const char *fileName, char *text);
+RLAPI bool SaveFileText(const char *fileName, const char *text);
 
+RLAPI void SetLoadFileDataCallback(LoadFileDataCallback callback);
+RLAPI void SetSaveFileDataCallback(SaveFileDataCallback callback);
+RLAPI void SetLoadFileTextCallback(LoadFileTextCallback callback);
+RLAPI void SetSaveFileTextCallback(SaveFileTextCallback callback);
+
+RLAPI int FileRename(const char *fileName, const char *fileRename);
+RLAPI int FileRemove(const char *fileName);
+RLAPI int FileCopy(const char *srcPath, const char *dstPath);
+RLAPI int FileMove(const char *srcPath, const char *dstPath);
+RLAPI int FileTextReplace(const char *fileName, const char *search, const char *replacement);
+RLAPI int FileTextFindIndex(const char *fileName, const char *search);
 RLAPI bool FileExists(const char *fileName);
 RLAPI bool DirectoryExists(const char *dirPath);
 RLAPI bool IsFileExtension(const char *fileName, const char *ext);
 RLAPI int GetFileLength(const char *fileName);
+RLAPI long GetFileModTime(const char *fileName);
 RLAPI const char *GetFileExtension(const char *fileName);
 RLAPI const char *GetFileName(const char *filePath);
 RLAPI const char *GetFileNameWithoutExt(const char *filePath);
@@ -917,7 +938,7 @@ RLAPI const char *GetPrevDirectoryPath(const char *dirPath);
 RLAPI const char *GetWorkingDirectory(void);
 RLAPI const char *GetApplicationDirectory(void);
 RLAPI int MakeDirectory(const char *dirPath);
-RLAPI bool ChangeDirectory(const char *dir);
+RLAPI bool ChangeDirectory(const char *dirPath);
 RLAPI bool IsPathFile(const char *path);
 RLAPI bool IsFileNameValid(const char *fileName);
 RLAPI FilePathList LoadDirectoryFiles(const char *dirPath);
@@ -926,15 +947,17 @@ RLAPI void UnloadDirectoryFiles(FilePathList files);
 RLAPI bool IsFileDropped(void);
 RLAPI FilePathList LoadDroppedFiles(void);
 RLAPI void UnloadDroppedFiles(FilePathList files);
-RLAPI long GetFileModTime(const char *fileName);
+RLAPI unsigned int GetDirectoryFileCount(const char *dirPath);
+RLAPI unsigned int GetDirectoryFileCountEx(const char *basePath, const char *filter, bool scanSubdirs);
 
 RLAPI unsigned char *CompressData(const unsigned char *data, int dataSize, int *compDataSize);
 RLAPI unsigned char *DecompressData(const unsigned char *compData, int compDataSize, int *dataSize);
 RLAPI char *EncodeDataBase64(const unsigned char *data, int dataSize, int *outputSize);
-RLAPI unsigned char *DecodeDataBase64(const unsigned char *data, int *outputSize);
+RLAPI unsigned char *DecodeDataBase64(const char *text, int *outputSize);
 RLAPI unsigned int ComputeCRC32(unsigned char *data, int dataSize);
 RLAPI unsigned int *ComputeMD5(unsigned char *data, int dataSize);
 RLAPI unsigned int *ComputeSHA1(unsigned char *data, int dataSize);
+RLAPI unsigned int *ComputeSHA256(unsigned char *data, int dataSize);
 
 RLAPI AutomationEventList LoadAutomationEventList(const char *fileName);
 RLAPI void UnloadAutomationEventList(AutomationEventList list);
@@ -952,6 +975,7 @@ RLAPI bool IsKeyReleased(int key);
 RLAPI bool IsKeyUp(int key);
 RLAPI int GetKeyPressed(void);
 RLAPI int GetCharPressed(void);
+RLAPI const char *GetKeyName(int key);
 RLAPI void SetExitKey(int key);
 
 RLAPI bool IsGamepadAvailable(int gamepad);
@@ -1010,15 +1034,18 @@ RLAPI void DrawLineV(Vector2 startPos, Vector2 endPos, Color color);
 RLAPI void DrawLineEx(Vector2 startPos, Vector2 endPos, float thick, Color color);
 RLAPI void DrawLineStrip(const Vector2 *points, int pointCount, Color color);
 RLAPI void DrawLineBezier(Vector2 startPos, Vector2 endPos, float thick, Color color);
+RLAPI void DrawLineDashed(Vector2 startPos, Vector2 endPos, int dashSize, int spaceSize, Color color);
 RLAPI void DrawCircle(int centerX, int centerY, float radius, Color color);
+RLAPI void DrawCircleV(Vector2 center, float radius, Color color);
+RLAPI void DrawCircleGradient(Vector2 center, float radius, Color inner, Color outer);
 RLAPI void DrawCircleSector(Vector2 center, float radius, float startAngle, float endAngle, int segments, Color color);
 RLAPI void DrawCircleSectorLines(Vector2 center, float radius, float startAngle, float endAngle, int segments, Color color);
-RLAPI void DrawCircleGradient(int centerX, int centerY, float radius, Color inner, Color outer);
-RLAPI void DrawCircleV(Vector2 center, float radius, Color color);
 RLAPI void DrawCircleLines(int centerX, int centerY, float radius, Color color);
 RLAPI void DrawCircleLinesV(Vector2 center, float radius, Color color);
 RLAPI void DrawEllipse(int centerX, int centerY, float radiusH, float radiusV, Color color);
+RLAPI void DrawEllipseV(Vector2 center, float radiusH, float radiusV, Color color);
 RLAPI void DrawEllipseLines(int centerX, int centerY, float radiusH, float radiusV, Color color);
+RLAPI void DrawEllipseLinesV(Vector2 center, float radiusH, float radiusV, Color color);
 RLAPI void DrawRing(Vector2 center, float innerRadius, float outerRadius, float startAngle, float endAngle, int segments, Color color);
 RLAPI void DrawRingLines(Vector2 center, float innerRadius, float outerRadius, float startAngle, float endAngle, int segments, Color color);
 RLAPI void DrawRectangle(int posX, int posY, int width, int height, Color color);
@@ -1027,7 +1054,7 @@ RLAPI void DrawRectangleRec(Rectangle rec, Color color);
 RLAPI void DrawRectanglePro(Rectangle rec, Vector2 origin, float rotation, Color color);
 RLAPI void DrawRectangleGradientV(int posX, int posY, int width, int height, Color top, Color bottom);
 RLAPI void DrawRectangleGradientH(int posX, int posY, int width, int height, Color left, Color right);
-RLAPI void DrawRectangleGradientEx(Rectangle rec, Color topLeft, Color bottomLeft, Color topRight, Color bottomRight);
+RLAPI void DrawRectangleGradientEx(Rectangle rec, Color topLeft, Color bottomLeft, Color bottomRight, Color topRight);
 RLAPI void DrawRectangleLines(int posX, int posY, int width, int height, Color color);
 RLAPI void DrawRectangleLinesEx(Rectangle rec, float lineThick, Color color);
 RLAPI void DrawRectangleRounded(Rectangle rec, float roundness, int segments, Color color);
@@ -1108,7 +1135,7 @@ RLAPI void ImageAlphaPremultiply(Image *image);
 RLAPI void ImageBlurGaussian(Image *image, int blurSize);
 RLAPI void ImageKernelConvolution(Image *image, const float *kernel, int kernelSize);
 RLAPI void ImageResize(Image *image, int newWidth, int newHeight);
-RLAPI void ImageResizeNN(Image *image, int newWidth,int newHeight);
+RLAPI void ImageResizeNN(Image *image, int newWidth, int newHeight);
 RLAPI void ImageResizeCanvas(Image *image, int newWidth, int newHeight, int offsetX, int offsetY, Color fill);
 RLAPI void ImageMipmaps(Image *image);
 RLAPI void ImageDither(Image *image, int rBpp, int gBpp, int bBpp, int aBpp);
@@ -1147,8 +1174,8 @@ RLAPI void ImageDrawRectangleLines(Image *dst, Rectangle rec, int thick, Color c
 RLAPI void ImageDrawTriangle(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color color);
 RLAPI void ImageDrawTriangleEx(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color c1, Color c2, Color c3);
 RLAPI void ImageDrawTriangleLines(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color color);
-RLAPI void ImageDrawTriangleFan(Image *dst, Vector2 *points, int pointCount, Color color);
-RLAPI void ImageDrawTriangleStrip(Image *dst, Vector2 *points, int pointCount, Color color);
+RLAPI void ImageDrawTriangleFan(Image *dst, const Vector2 *points, int pointCount, Color color);
+RLAPI void ImageDrawTriangleStrip(Image *dst, const Vector2 *points, int pointCount, Color color);
 RLAPI void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color tint);
 RLAPI void ImageDrawText(Image *dst, const char *text, int posX, int posY, int fontSize, Color color);
 RLAPI void ImageDrawTextEx(Image *dst, Font font, const char *text, Vector2 position, float fontSize, float spacing, Color tint);
@@ -1195,11 +1222,11 @@ RLAPI int GetPixelDataSize(int width, int height, int format);
 
 RLAPI Font GetFontDefault(void);
 RLAPI Font LoadFont(const char *fileName);
-RLAPI Font LoadFontEx(const char *fileName, int fontSize, int *codepoints, int codepointCount);
+RLAPI Font LoadFontEx(const char *fileName, int fontSize, const int *codepoints, int codepointCount);
 RLAPI Font LoadFontFromImage(Image image, Color key, int firstChar);
-RLAPI Font LoadFontFromMemory(const char *fileType, const unsigned char *fileData, int dataSize, int fontSize, int *codepoints, int codepointCount);
+RLAPI Font LoadFontFromMemory(const char *fileType, const unsigned char *fileData, int dataSize, int fontSize, const int *codepoints, int codepointCount);
 RLAPI bool IsFontValid(Font font);
-RLAPI GlyphInfo *LoadFontData(const unsigned char *fileData, int dataSize, int fontSize, int *codepoints, int codepointCount, int type);
+RLAPI GlyphInfo *LoadFontData(const unsigned char *fileData, int dataSize, int fontSize, const int *codepoints, int codepointCount, int type, int *glyphCount);
 RLAPI Image GenImageFontAtlas(const GlyphInfo *glyphs, Rectangle **glyphRecs, int glyphCount, int fontSize, int padding, int packMethod);
 RLAPI void UnloadFontData(GlyphInfo *glyphs, int glyphCount);
 RLAPI void UnloadFont(Font font);
@@ -1215,6 +1242,7 @@ RLAPI void DrawTextCodepoints(Font font, const int *codepoints, int codepointCou
 RLAPI void SetTextLineSpacing(int spacing);
 RLAPI int MeasureText(const char *text, int fontSize);
 RLAPI Vector2 MeasureTextEx(Font font, const char *text, float fontSize, float spacing);
+RLAPI Vector2 MeasureTextCodepoints(Font font, const int *codepoints, int length, float fontSize, float spacing);
 RLAPI int GetGlyphIndex(Font font, int codepoint);
 RLAPI GlyphInfo GetGlyphInfo(Font font, int codepoint);
 RLAPI Rectangle GetGlyphAtlasRec(Font font, int codepoint);
@@ -1229,23 +1257,30 @@ RLAPI int GetCodepointNext(const char *text, int *codepointSize);
 RLAPI int GetCodepointPrevious(const char *text, int *codepointSize);
 RLAPI const char *CodepointToUTF8(int codepoint, int *utf8Size);
 
+RLAPI char **LoadTextLines(const char *text, int *count);
+RLAPI void UnloadTextLines(char **text, int lineCount);
 RLAPI int TextCopy(char *dst, const char *src);
 RLAPI bool TextIsEqual(const char *text1, const char *text2);
 RLAPI unsigned int TextLength(const char *text);
 RLAPI const char *TextFormat(const char *text, ...);
 RLAPI const char *TextSubtext(const char *text, int position, int length);
-RLAPI char *TextReplace(const char *text, const char *replace, const char *by);
+RLAPI const char *TextRemoveSpaces(const char *text);
+RLAPI char *GetTextBetween(const char *text, const char *begin, const char *end);
+RLAPI char *TextReplace(const char *text, const char *search, const char *replacement);
+RLAPI char *TextReplaceAlloc(const char *text, const char *search, const char *replacement);
+RLAPI char *TextReplaceBetween(const char *text, const char *begin, const char *end, const char *replacement);
+RLAPI char *TextReplaceBetweenAlloc(const char *text, const char *begin, const char *end, const char *replacement);
 RLAPI char *TextInsert(const char *text, const char *insert, int position);
-RLAPI const char *TextJoin(const char **textList, int count, const char *delimiter);
-RLAPI const char **TextSplit(const char *text, char delimiter, int *count);
+RLAPI char *TextInsertAlloc(const char *text, const char *insert, int position);
+RLAPI char *TextJoin(char **textList, int count, const char *delimiter);
+RLAPI char **TextSplit(const char *text, char delimiter, int *count);
 RLAPI void TextAppend(char *text, const char *append, int *position);
-RLAPI int TextFindIndex(const char *text, const char *find);
-RLAPI const char *TextToUpper(const char *text);
-RLAPI const char *TextToLower(const char *text);
-RLAPI const char *TextToPascal(const char *text);
-RLAPI const char *TextToSnake(const char *text);
-RLAPI const char *TextToCamel(const char *text);
-
+RLAPI int TextFindIndex(const char *text, const char *search);
+RLAPI char *TextToUpper(const char *text);
+RLAPI char *TextToLower(const char *text);
+RLAPI char *TextToPascal(const char *text);
+RLAPI char *TextToSnake(const char *text);
+RLAPI char *TextToCamel(const char *text);
 RLAPI int TextToInteger(const char *text);
 RLAPI float TextToFloat(const char *text);
 
@@ -1281,8 +1316,6 @@ RLAPI void DrawModel(Model model, Vector3 position, float scale, Color tint);
 RLAPI void DrawModelEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, Color tint);
 RLAPI void DrawModelWires(Model model, Vector3 position, float scale, Color tint);
 RLAPI void DrawModelWiresEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, Color tint);
-RLAPI void DrawModelPoints(Model model, Vector3 position, float scale, Color tint);
-RLAPI void DrawModelPointsEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, Color tint);
 RLAPI void DrawBoundingBox(BoundingBox box, Color color);
 RLAPI void DrawBillboard(Camera camera, Texture2D texture, Vector3 position, float scale, Color tint);
 RLAPI void DrawBillboardRec(Camera camera, Texture2D texture, Rectangle source, Vector3 position, Vector2 size, Color tint);
@@ -1318,9 +1351,8 @@ RLAPI void SetMaterialTexture(Material *material, int mapType, Texture2D texture
 RLAPI void SetModelMeshMaterial(Model *model, int meshId, int materialId);
 
 RLAPI ModelAnimation *LoadModelAnimations(const char *fileName, int *animCount);
-RLAPI void UpdateModelAnimation(Model model, ModelAnimation anim, int frame);
-RLAPI void UpdateModelAnimationBones(Model model, ModelAnimation anim, int frame);
-RLAPI void UnloadModelAnimation(ModelAnimation anim);
+RLAPI void UpdateModelAnimation(Model model, ModelAnimation anim, float frame);
+RLAPI void UpdateModelAnimationEx(Model model, ModelAnimation animA, float frameA, ModelAnimation animB, float frameB, float blend);
 RLAPI void UnloadModelAnimations(ModelAnimation *animations, int animCount);
 RLAPI bool IsModelAnimationValid(Model model, ModelAnimation anim);
 

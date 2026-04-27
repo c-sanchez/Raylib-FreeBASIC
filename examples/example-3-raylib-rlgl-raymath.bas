@@ -66,7 +66,8 @@ sub DrawLightMask(byval slot as long)
     rlSetBlendMode(BLEND_CUSTOM)
 
     if lights(slot).valid then
-      DrawCircleGradient(cint(lights(slot).position.x), cint(lights(slot).position.y), lights(slot).outerRadius, ColorAlpha(WHITE, 0), WHITE)
+      ' Actualizado para Raylib 6.0: Ahora se pasa el Vector2 completo en lugar de x, y separados
+      DrawCircleGradient(lights(slot).position, lights(slot).outerRadius, ColorAlpha(WHITE, 0), WHITE)
     end if
 
     rlDrawRenderBatchActive()
@@ -178,7 +179,7 @@ dim showLines as boolean = false
 
 SetTargetFPS(60)
 
-while not WindowShouldClose()
+while isnot WindowShouldClose()
   if IsMouseButtonDown(MOUSE_BUTTON_LEFT) then MoveLight(0, GetMousePosition().x, GetMousePosition().y)
 
   if IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) and (nextLight < MAX_LIGHTS) then

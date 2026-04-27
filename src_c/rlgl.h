@@ -2,7 +2,7 @@
 #ifndef RLGL_H
 #define RLGL_H
 
-#define RLGL_VERSION  "5.0"
+#define RLGL_VERSION  "6.0"
 
 #if defined(_WIN32) && defined(BUILD_LIBTYPE_SHARED)
     #define RLAPI __declspec(dllexport)
@@ -18,7 +18,6 @@
 
 #ifndef TRACELOG
     #define TRACELOG(level, ...) (void)0
-    #define TRACELOGD(...) (void)0
 #endif
 
 #ifndef RL_MALLOC
@@ -34,7 +33,8 @@
     #define RL_FREE(p)        free(p)
 #endif
 
-#if !defined(GRAPHICS_API_OPENGL_11) && \
+#if !defined(GRAPHICS_API_OPENGL_SOFTWARE) && \
+    !defined(GRAPHICS_API_OPENGL_11) && \
     !defined(GRAPHICS_API_OPENGL_21) && \
     !defined(GRAPHICS_API_OPENGL_33) && \
     !defined(GRAPHICS_API_OPENGL_43) && \
@@ -43,7 +43,7 @@
         #define GRAPHICS_API_OPENGL_33
 #endif
 
-#if defined(GRAPHICS_API_OPENGL_11)
+#if defined(GRAPHICS_API_OPENGL_11) || defined(GRAPHICS_API_OPENGL_SOFTWARE)
     #if defined(GRAPHICS_API_OPENGL_21)
         #undef GRAPHICS_API_OPENGL_21
     #endif
@@ -58,6 +58,10 @@
     #endif
 #endif
 
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+    #define GRAPHICS_API_OPENGL_11
+#endif
+
 #if defined(GRAPHICS_API_OPENGL_21)
     #define GRAPHICS_API_OPENGL_33
 #endif
@@ -69,8 +73,6 @@
 #if defined(GRAPHICS_API_OPENGL_ES3)
     #define GRAPHICS_API_OPENGL_ES2
 #endif
-
-#define RLGL_RENDER_TEXTURES_HINT
 
 #ifndef RL_DEFAULT_BATCH_BUFFER_ELEMENTS
     #if defined(GRAPHICS_API_OPENGL_11) || defined(GRAPHICS_API_OPENGL_33)
@@ -101,10 +103,10 @@
 #endif
 
 #ifndef RL_CULL_DISTANCE_NEAR
-    #define RL_CULL_DISTANCE_NEAR                 0.01
+    #define RL_CULL_DISTANCE_NEAR                 0.05
 #endif
 #ifndef RL_CULL_DISTANCE_FAR
-    #define RL_CULL_DISTANCE_FAR                1000.0
+    #define RL_CULL_DISTANCE_FAR                4000.0
 #endif
 
 #define RL_TEXTURE_WRAP_S                       0x2802
@@ -205,13 +207,14 @@
 #ifndef RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES
     #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES     6
 #endif
-#ifdef RL_SUPPORT_MESH_GPU_SKINNING
-#ifndef RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEIDS
-    #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEIDS     7
+#ifndef RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEINDICES
+    #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEINDICES 7
 #endif
 #ifndef RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEWEIGHTS
     #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEWEIGHTS 8
 #endif
+#ifndef RL_DEFAULT_SHADER_ATTRIB_LOCATION_INSTANCETRANSFORM
+    #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_INSTANCETRANSFORM 9
 #endif
 
 #if (defined(__STDC__) && __STDC_VERSION__ >= 199901L) || (defined(_MSC_VER) && _MSC_VER >= 1800)
@@ -269,7 +272,8 @@ typedef struct rlRenderBatch {
 } rlRenderBatch;
 
 typedef enum {
-    RL_OPENGL_11 = 1,
+    RL_OPENGL_SOFTWARE = 0,
+    RL_OPENGL_11,
     RL_OPENGL_21,
     RL_OPENGL_33,
     RL_OPENGL_43,
@@ -457,10 +461,8 @@ RLAPI void rlEnableVertexBufferElement(unsigned int id);
 RLAPI void rlDisableVertexBufferElement(void);
 RLAPI void rlEnableVertexAttribute(unsigned int index);
 RLAPI void rlDisableVertexAttribute(unsigned int index);
-#if defined(GRAPHICS_API_OPENGL_11)
 RLAPI void rlEnableStatePointer(int vertexAttribType, void *buffer);
 RLAPI void rlDisableStatePointer(int vertexAttribType);
-#endif
 
 RLAPI void rlActiveTextureSlot(int slot);
 RLAPI void rlEnableTexture(unsigned int id);
@@ -493,8 +495,11 @@ RLAPI void rlSetCullFace(int mode);
 RLAPI void rlEnableScissorTest(void);
 RLAPI void rlDisableScissorTest(void);
 RLAPI void rlScissor(int x, int y, int width, int height);
-RLAPI void rlEnableWireMode(void);
 RLAPI void rlEnablePointMode(void);
+RLAPI void rlDisablePointMode(void);
+RLAPI void rlSetPointSize(float size);
+RLAPI float rlGetPointSize(void);
+RLAPI void rlEnableWireMode(void);
 RLAPI void rlDisableWireMode(void);
 RLAPI void rlSetLineWidth(float width);
 RLAPI float rlGetLineWidth(void);
@@ -514,6 +519,7 @@ RLAPI void rlSetBlendFactorsSeparate(int glSrcRGB, int glDstRGB, int glSrcAlpha,
 RLAPI void rlglInit(int width, int height);
 RLAPI void rlglClose(void);
 RLAPI void rlLoadExtensions(void *loader);
+RLAPI void *rlGetProcAddress(const char *procName);
 RLAPI int rlGetVersion(void);
 RLAPI void rlSetFramebufferWidth(int width);
 RLAPI int rlGetFramebufferWidth(void);
@@ -560,23 +566,27 @@ RLAPI void *rlReadTexturePixels(unsigned int id, int width, int height, int form
 RLAPI unsigned char *rlReadScreenPixels(int width, int height);
 
 RLAPI unsigned int rlLoadFramebuffer(void);
-RLAPI void rlFramebufferAttach(unsigned int fboId, unsigned int texId, int attachType, int texType, int mipLevel);
+RLAPI void rlFramebufferAttach(unsigned int id, unsigned int texId, int attachType, int texType, int mipLevel);
 RLAPI bool rlFramebufferComplete(unsigned int id);
 RLAPI void rlUnloadFramebuffer(unsigned int id);
 
-RLAPI unsigned int rlLoadShaderCode(const char *vsCode, const char *fsCode);
-RLAPI unsigned int rlCompileShader(const char *shaderCode, int type);
-RLAPI unsigned int rlLoadShaderProgram(unsigned int vShaderId, unsigned int fShaderId);
+RLAPI void rlCopyFramebuffer(int x, int y, int width, int height, int format, void *pixels);
+RLAPI void rlResizeFramebuffer(int width, int height);
+
+RLAPI unsigned int rlLoadShader(const char *code, int type);
+RLAPI unsigned int rlLoadShaderProgram(const char *vsCode, const char *fsCode);
+RLAPI unsigned int rlLoadShaderProgramEx(unsigned int vsId, unsigned int fsId);
+RLAPI unsigned int rlLoadShaderProgramCompute(unsigned int csId);
+RLAPI void rlUnloadShader(unsigned int id);
 RLAPI void rlUnloadShaderProgram(unsigned int id);
-RLAPI int rlGetLocationUniform(unsigned int shaderId, const char *uniformName);
-RLAPI int rlGetLocationAttrib(unsigned int shaderId, const char *attribName);
+RLAPI int rlGetLocationUniform(unsigned int id, const char *uniformName);
+RLAPI int rlGetLocationAttrib(unsigned int id, const char *attribName);
 RLAPI void rlSetUniform(int locIndex, const void *value, int uniformType, int count);
 RLAPI void rlSetUniformMatrix(int locIndex, Matrix mat);
 RLAPI void rlSetUniformMatrices(int locIndex, const Matrix *mat, int count);
 RLAPI void rlSetUniformSampler(int locIndex, unsigned int textureId);
 RLAPI void rlSetShader(unsigned int id, int *locs);
 
-RLAPI unsigned int rlLoadComputeShaderProgram(unsigned int shaderId);
 RLAPI void rlComputeShaderDispatch(unsigned int groupX, unsigned int groupY, unsigned int groupZ);
 
 RLAPI unsigned int rlLoadShaderBuffer(unsigned int size, const void *data, int usageHint);
@@ -616,24 +626,33 @@ RLAPI void rlLoadDrawQuad(void);
 #endif
 
 #if defined(GRAPHICS_API_OPENGL_11)
-    #if defined(__APPLE__)
-        #include <OpenGL/gl.h>
-        #include <OpenGL/glext.h>
+    #if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+        #define RLSW_IMPLEMENTATION
+        #define SW_MALLOC(sz) RL_MALLOC(sz)
+        #define SW_CALLOC(n,sz) RL_CALLOC(n, sz)
+        #define SW_REALLOC(ptr, newSz) RL_REALLOC(ptr, newSz)
+        #define SW_FREE(ptr) RL_FREE(ptr)
+        #include "external/rlsw.h"
     #else
+        #if defined(__APPLE__)
+            #include <OpenGL/gl.h>
+            #include <OpenGL/glext.h>
+        #else
 
-        #if !defined(APIENTRY)
-            #if defined(_WIN32)
-                #define APIENTRY __stdcall
-            #else
-                #define APIENTRY
+            #if !defined(APIENTRY)
+                #if defined(_WIN32)
+                    #define APIENTRY __stdcall
+                #else
+                    #define APIENTRY
+                #endif
             #endif
-        #endif
 
-        #if !defined(WINGDIAPI) && defined(_WIN32)
-            #define WINGDIAPI __declspec(dllimport)
-        #endif
+            #if !defined(WINGDIAPI) && defined(_WIN32)
+                #define WINGDIAPI __declspec(dllimport)
+            #endif
 
-        #include <GL/gl.h>
+            #include <GL/gl.h>
+        #endif
     #endif
 #endif
 
@@ -772,11 +791,15 @@ RLAPI void rlLoadDrawQuad(void);
 #ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2
     #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2    "vertexTexCoord2"
 #endif
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_BONEIDS
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_BONEIDS      "vertexBoneIds"
+#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_BONEINDICES
+    #define RL_DEFAULT_SHADER_ATTRIB_NAME_BONEINDICES  "vertexBoneIndices"
 #endif
 #ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS
     #define RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS  "vertexBoneWeights"
+#endif
+
+#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_INSTANCETRANSFORM
+    #define RL_DEFAULT_SHADER_ATTRIB_NAME_INSTANCETRANSFORM "instanceTransform"
 #endif
 
 #ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_MVP
@@ -797,9 +820,6 @@ RLAPI void rlLoadDrawQuad(void);
 #ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR
     #define RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR       "colDiffuse"
 #endif
-#ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_BONE_MATRICES
-    #define RL_DEFAULT_SHADER_UNIFORM_NAME_BONE_MATRICES  "boneMatrices"
-#endif
 #ifndef RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0
     #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0  "texture0"
 #endif
@@ -809,11 +829,19 @@ RLAPI void rlLoadDrawQuad(void);
 #ifndef RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2
     #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2  "texture2"
 #endif
+#ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_BONEMATRICES
+    #define RL_DEFAULT_SHADER_UNIFORM_NAME_BONEMATRICES "boneMatrices"
+#endif
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
+
+typedef void *(*rlglLoadProc)(const char *name);
+
 typedef struct rlglData {
     rlRenderBatch *currentBatch;
     rlRenderBatch defaultBatch;
+
+    rlglLoadProc loader;
 
     struct {
         int vertexCounter;
@@ -830,6 +858,7 @@ typedef struct rlglData {
         Matrix stack[RL_MAX_MATRIX_STACK_SIZE];
         int stackCounter;
 
+        unsigned int currentTextureId;
         unsigned int defaultTextureId;
         unsigned int activeTextureId[RL_DEFAULT_BATCH_MAX_TEXTURE_UNITS];
         unsigned int defaultVShaderId;
@@ -883,10 +912,9 @@ typedef struct rlglData {
     } ExtSupported;
 } rlglData;
 
-typedef void *(*rlglLoadProc)(const char *name);
-
 #endif
 
+static bool isGpuReady = false;
 static double rlCullDistanceNear = RL_CULL_DISTANCE_NEAR;
 static double rlCullDistanceFar = RL_CULL_DISTANCE_FAR;
 
@@ -908,22 +936,23 @@ static PFNGLVERTEXATTRIBDIVISOREXTPROC glVertexAttribDivisor = NULL;
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
 static void rlLoadShaderDefault(void);
 static void rlUnloadShaderDefault(void);
-#if defined(RLGL_SHOW_GL_DETAILS_INFO)
+#if RLGL_SHOW_GL_DETAILS_INFO
 static const char *rlGetCompressedFormatName(int format);
 #endif
 #endif
 
 static int rlGetPixelDataSize(int width, int height, int format);
 
-typedef struct rl_float16 {
-    float v[16];
-} rl_float16;
+static Matrix rlMatrixIdentity(void);
+#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
+
+typedef struct rl_float16 { float v[16]; } rl_float16;
 static rl_float16 rlMatrixToFloatV(Matrix mat);
 #define rlMatrixToFloat(mat) (rlMatrixToFloatV(mat).v)
-static Matrix rlMatrixIdentity(void);
 static Matrix rlMatrixMultiply(Matrix left, Matrix right);
 static Matrix rlMatrixTranspose(Matrix mat);
 static Matrix rlMatrixInvert(Matrix mat);
+#endif
 
 #if defined(GRAPHICS_API_OPENGL_11)
 
@@ -1003,12 +1032,11 @@ void rlLoadIdentity(void)
 
 void rlTranslatef(float x, float y, float z)
 {
-    Matrix matTranslation = {
-        1.0f, 0.0f, 0.0f, x,
-        0.0f, 1.0f, 0.0f, y,
-        0.0f, 0.0f, 1.0f, z,
-        0.0f, 0.0f, 0.0f, 1.0f
-    };
+    Matrix matTranslation = rlMatrixIdentity();
+
+    matTranslation.m12 = x;
+    matTranslation.m13 = y;
+    matTranslation.m14 = z;
 
     *RLGL.State.currentMatrix = rlMatrixMultiply(matTranslation, *RLGL.State.currentMatrix);
 }
@@ -1055,12 +1083,11 @@ void rlRotatef(float angle, float x, float y, float z)
 
 void rlScalef(float x, float y, float z)
 {
-    Matrix matScale = {
-        x, 0.0f, 0.0f, 0.0f,
-        0.0f, y, 0.0f, 0.0f,
-        0.0f, 0.0f, z, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f
-    };
+    Matrix matScale = rlMatrixIdentity();
+
+    matScale.m0 = x;
+    matScale.m5 = y;
+    matScale.m10 = z;
 
     *RLGL.State.currentMatrix = rlMatrixMultiply(matScale, *RLGL.State.currentMatrix);
 }
@@ -1205,8 +1232,8 @@ void rlBegin(int mode)
         if (RLGL.currentBatch->drawCounter >= RL_DEFAULT_BATCH_DRAWCALLS) rlDrawRenderBatch(RLGL.currentBatch);
 
         RLGL.currentBatch->draws[RLGL.currentBatch->drawCounter - 1].mode = mode;
-        RLGL.currentBatch->draws[RLGL.currentBatch->drawCounter - 1].vertexCount = 0;
-        RLGL.currentBatch->draws[RLGL.currentBatch->drawCounter - 1].textureId = RLGL.State.defaultTextureId;
+        RLGL.currentBatch->draws[RLGL.currentBatch->drawCounter - 1].textureId = RLGL.State.currentTextureId;
+        RLGL.State.currentTextureId = RLGL.State.defaultTextureId;
     }
 }
 
@@ -1296,14 +1323,7 @@ void rlNormal3f(float x, float y, float z)
         normaly = RLGL.State.transform.m1*x + RLGL.State.transform.m5*y + RLGL.State.transform.m9*z;
         normalz = RLGL.State.transform.m2*x + RLGL.State.transform.m6*y + RLGL.State.transform.m10*z;
     }
-    float length = sqrtf(normalx*normalx + normaly*normaly + normalz*normalz);
-    if (length != 0.0f)
-    {
-        float ilength = 1.0f/length;
-        normalx *= ilength;
-        normaly *= ilength;
-        normalz *= ilength;
-    }
+
     RLGL.State.normalx = normalx;
     RLGL.State.normaly = normaly;
     RLGL.State.normalz = normalz;
@@ -1342,6 +1362,7 @@ void rlSetTexture(unsigned int id)
         {
             rlDrawRenderBatch(RLGL.currentBatch);
         }
+        RLGL.State.currentTextureId = RLGL.State.defaultTextureId;
 #endif
     }
     else
@@ -1349,6 +1370,7 @@ void rlSetTexture(unsigned int id)
 #if defined(GRAPHICS_API_OPENGL_11)
         rlEnableTexture(id);
 #else
+        RLGL.State.currentTextureId = id;
         if (RLGL.currentBatch->draws[RLGL.currentBatch->drawCounter - 1].textureId != id)
         {
             if (RLGL.currentBatch->draws[RLGL.currentBatch->drawCounter - 1].vertexCount > 0)
@@ -1363,6 +1385,9 @@ void rlSetTexture(unsigned int id)
                     RLGL.State.vertexCounter += RLGL.currentBatch->draws[RLGL.currentBatch->drawCounter - 1].vertexAlignment;
 
                     RLGL.currentBatch->drawCounter++;
+
+                    RLGL.currentBatch->draws[RLGL.currentBatch->drawCounter - 1].mode = RLGL.currentBatch->draws[RLGL.currentBatch->drawCounter - 2].mode;
+
                 }
             }
 
@@ -1416,11 +1441,6 @@ void rlTextureParameters(unsigned int id, int param, int value)
 {
     glBindTexture(GL_TEXTURE_2D, id);
 
-#if !defined(GRAPHICS_API_OPENGL_11)
-
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
-#endif
-
     switch (param)
     {
         case RL_TEXTURE_WRAP_S:
@@ -1434,13 +1454,15 @@ void rlTextureParameters(unsigned int id, int param, int value)
 #endif
             }
             else glTexParameteri(GL_TEXTURE_2D, param, value);
-
         } break;
         case RL_TEXTURE_MAG_FILTER:
         case RL_TEXTURE_MIN_FILTER: glTexParameteri(GL_TEXTURE_2D, param, value); break;
         case RL_TEXTURE_FILTER_ANISOTROPIC:
         {
 #if !defined(GRAPHICS_API_OPENGL_11)
+
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
+
             if (value <= RLGL.ExtSupported.maxAnisotropyLevel) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, (float)value);
             else if (RLGL.ExtSupported.maxAnisotropyLevel > 0.0f)
             {
@@ -1477,7 +1499,6 @@ void rlCubemapParameters(unsigned int id, int param, int value)
                 else TRACELOG(RL_LOG_WARNING, "GL: Clamp mirror wrap mode not supported (GL_MIRROR_CLAMP_EXT)");
             }
             else glTexParameteri(GL_TEXTURE_CUBE_MAP, param, value);
-
         } break;
         case RL_TEXTURE_MAG_FILTER:
         case RL_TEXTURE_MIN_FILTER: glTexParameteri(GL_TEXTURE_CUBE_MAP, param, value); break;
@@ -1517,7 +1538,7 @@ void rlDisableShader(void)
 
 void rlEnableFramebuffer(unsigned int id)
 {
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)) && defined(RLGL_RENDER_TEXTURES_HINT)
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
     glBindFramebuffer(GL_FRAMEBUFFER, id);
 #endif
 }
@@ -1525,7 +1546,7 @@ void rlEnableFramebuffer(unsigned int id)
 unsigned int rlGetActiveFramebuffer(void)
 {
     GLint fboId = 0;
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES3)) && defined(RLGL_RENDER_TEXTURES_HINT)
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES3) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fboId);
 #endif
     return fboId;
@@ -1533,45 +1554,35 @@ unsigned int rlGetActiveFramebuffer(void)
 
 void rlDisableFramebuffer(void)
 {
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)) && defined(RLGL_RENDER_TEXTURES_HINT)
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 #endif
 }
 
 void rlBlitFramebuffer(int srcX, int srcY, int srcWidth, int srcHeight, int dstX, int dstY, int dstWidth, int dstHeight, int bufferMask)
 {
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES3)) && defined(RLGL_RENDER_TEXTURES_HINT)
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES3))
     glBlitFramebuffer(srcX, srcY, srcWidth, srcHeight, dstX, dstY, dstWidth, dstHeight, bufferMask, GL_NEAREST);
 #endif
 }
 
 void rlBindFramebuffer(unsigned int target, unsigned int framebuffer)
 {
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)) && defined(RLGL_RENDER_TEXTURES_HINT)
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
     glBindFramebuffer(target, framebuffer);
 #endif
 }
 
 void rlActiveDrawBuffers(int count)
 {
-#if ((defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES3)) && defined(RLGL_RENDER_TEXTURES_HINT))
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES3))
 
     if (count > 0)
     {
-        if (count > 8) TRACELOG(LOG_WARNING, "GL: Max color buffers limited to 8");
+        if (count > 8) TRACELOG(RL_LOG_WARNING, "GL: Max color buffers limited to 8");
         else
         {
             unsigned int buffers[8] = {
-#if defined(GRAPHICS_API_OPENGL_ES3)
-                GL_COLOR_ATTACHMENT0_EXT,
-                GL_COLOR_ATTACHMENT1_EXT,
-                GL_COLOR_ATTACHMENT2_EXT,
-                GL_COLOR_ATTACHMENT3_EXT,
-                GL_COLOR_ATTACHMENT4_EXT,
-                GL_COLOR_ATTACHMENT5_EXT,
-                GL_COLOR_ATTACHMENT6_EXT,
-                GL_COLOR_ATTACHMENT7_EXT,
-#else
                 GL_COLOR_ATTACHMENT0,
                 GL_COLOR_ATTACHMENT1,
                 GL_COLOR_ATTACHMENT2,
@@ -1580,17 +1591,12 @@ void rlActiveDrawBuffers(int count)
                 GL_COLOR_ATTACHMENT5,
                 GL_COLOR_ATTACHMENT6,
                 GL_COLOR_ATTACHMENT7,
-#endif
             };
 
-#if defined(GRAPHICS_API_OPENGL_ES3)
-            glDrawBuffersEXT(count, buffers);
-#else
             glDrawBuffers(count, buffers);
-#endif
         }
     }
-    else TRACELOG(LOG_WARNING, "GL: One color buffer active by default");
+    else TRACELOG(RL_LOG_WARNING, "GL: One color buffer active by default");
 #endif
 }
 
@@ -1636,6 +1642,14 @@ void rlEnableWireMode(void)
 #endif
 }
 
+void rlDisableWireMode(void)
+{
+#if defined(GRAPHICS_API_OPENGL_11) || defined(GRAPHICS_API_OPENGL_33)
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+#endif
+}
+
 void rlEnablePointMode(void)
 {
 #if defined(GRAPHICS_API_OPENGL_11) || defined(GRAPHICS_API_OPENGL_33)
@@ -1645,7 +1659,7 @@ void rlEnablePointMode(void)
 #endif
 }
 
-void rlDisableWireMode(void)
+void rlDisablePointMode(void)
 {
 #if defined(GRAPHICS_API_OPENGL_11) || defined(GRAPHICS_API_OPENGL_33)
 
@@ -1660,6 +1674,23 @@ float rlGetLineWidth(void)
     float width = 0;
     glGetFloatv(GL_LINE_WIDTH, &width);
     return width;
+}
+
+void rlSetPointSize(float size)
+{
+#if defined(GRAPHICS_API_OPENGL_11)
+    glPointSize(size);
+#endif
+}
+
+float rlGetPointSize(void)
+{
+    float size = 1;
+#if defined(GRAPHICS_API_OPENGL_11)
+    glGetFloatv(GL_POINT_SIZE, &size);
+#endif
+    return size;
+
 }
 
 void rlEnableSmoothLines(void)
@@ -1758,14 +1789,12 @@ void rlSetBlendMode(int mode)
             {
 
                 glBlendFunc(RLGL.State.glBlendSrcFactor, RLGL.State.glBlendDstFactor); glBlendEquation(RLGL.State.glBlendEquation);
-
             } break;
             case RL_BLEND_CUSTOM_SEPARATE:
             {
 
                 glBlendFuncSeparate(RLGL.State.glBlendSrcFactorRGB, RLGL.State.glBlendDestFactorRGB, RLGL.State.glBlendSrcFactorAlpha, RLGL.State.glBlendDestFactorAlpha);
                 glBlendEquationSeparate(RLGL.State.glBlendEquationRGB, RLGL.State.glBlendEquationAlpha);
-
             } break;
             default: break;
         }
@@ -1814,7 +1843,7 @@ void rlSetBlendFactorsSeparate(int glSrcRGB, int glDstRGB, int glSrcAlpha, int g
 #endif
 }
 
-#if defined(RLGL_ENABLE_OPENGL_DEBUG_CONTEXT) && defined(GRAPHICS_API_OPENGL_43)
+#if defined(GRAPHICS_API_OPENGL_43) && RLGL_ENABLE_OPENGL_DEBUG_CONTEXT
 static void GLAPIENTRY rlDebugMessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
 {
 
@@ -1857,17 +1886,18 @@ static void GLAPIENTRY rlDebugMessageCallback(GLenum source, GLenum type, GLuint
         default: break;
     }
 
-    TRACELOG(LOG_WARNING, "GL: OpenGL debug message: %s", message);
-    TRACELOG(LOG_WARNING, "    > Type: %s", msgType);
-    TRACELOG(LOG_WARNING, "    > Source = %s", msgSource);
-    TRACELOG(LOG_WARNING, "    > Severity = %s", msgSeverity);
+    TRACELOG(RL_LOG_WARNING, "GL: OpenGL debug message: %s", message);
+    TRACELOG(RL_LOG_WARNING, "    > Type: %s", msgType);
+    TRACELOG(RL_LOG_WARNING, "    > Source = %s", msgSource);
+    TRACELOG(RL_LOG_WARNING, "    > Severity = %s", msgSeverity);
 }
 #endif
 
 void rlglInit(int width, int height)
 {
+    isGpuReady = true;
 
-#if defined(RLGL_ENABLE_OPENGL_DEBUG_CONTEXT) && defined(GRAPHICS_API_OPENGL_43)
+#if defined(GRAPHICS_API_OPENGL_43) && RLGL_ENABLE_OPENGL_DEBUG_CONTEXT
     if ((glDebugMessageCallback != NULL) && (glDebugMessageControl != NULL))
     {
         glDebugMessageCallback(rlDebugMessageCallback, 0);
@@ -1881,6 +1911,7 @@ void rlglInit(int width, int height)
 
     unsigned char pixels[4] = { 255, 255, 255, 255 };
     RLGL.State.defaultTextureId = rlLoadTexture(pixels, 1, 1, RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
+    RLGL.State.currentTextureId = RLGL.State.defaultTextureId;
 
     if (RLGL.State.defaultTextureId != 0) TRACELOG(RL_LOG_INFO, "TEXTURE: [ID %i] Default texture loaded successfully", RLGL.State.defaultTextureId);
     else TRACELOG(RL_LOG_WARNING, "TEXTURE: Failed to load default texture");
@@ -1902,6 +1933,16 @@ void rlglInit(int width, int height)
     RLGL.State.currentMatrix = &RLGL.State.modelview;
 #endif
 
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+
+    int result = swInit(width, height);
+    if (result == 0)
+    {
+        TRACELOG(RL_LOG_ERROR, "RLSW: Software renderer initialization failed!");
+        exit(-1);
+    }
+#endif
+
     glDepthFunc(GL_LEQUAL);
     glDisable(GL_DEPTH_TEST);
 
@@ -1912,28 +1953,27 @@ void rlglInit(int width, int height)
     glFrontFace(GL_CCW);
     glEnable(GL_CULL_FACE);
 
-#if defined(GRAPHICS_API_OPENGL_33)
-    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-#endif
-
 #if defined(GRAPHICS_API_OPENGL_11)
 
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glShadeModel(GL_SMOOTH);
 #endif
+#if defined(GRAPHICS_API_OPENGL_33)
 
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+#endif
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
 
     RLGL.State.framebufferWidth = width;
     RLGL.State.framebufferHeight = height;
-
-    TRACELOG(RL_LOG_INFO, "RLGL: Default OpenGL state initialized successfully");
-
 #endif
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClearDepth(1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    TRACELOG(RL_LOG_INFO, "RLGL: Default OpenGL state initialized successfully");
+
 }
 
 void rlglClose(void)
@@ -1946,6 +1986,11 @@ void rlglClose(void)
     glDeleteTextures(1, &RLGL.State.defaultTextureId);
     TRACELOG(RL_LOG_INFO, "TEXTURE: [ID %i] Default texture unloaded successfully", RLGL.State.defaultTextureId);
 #endif
+
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+    swClose();
+#endif
+    isGpuReady = false;
 }
 
 void rlLoadExtensions(void *loader)
@@ -1959,7 +2004,7 @@ void rlLoadExtensions(void *loader)
     glGetIntegerv(GL_NUM_EXTENSIONS, &numExt);
     TRACELOG(RL_LOG_INFO, "GL: Supported extensions count: %i", numExt);
 
-#if defined(RLGL_SHOW_GL_DETAILS_INFO)
+#if RLGL_SHOW_GL_DETAILS_INFO
 
     TRACELOG(RL_LOG_INFO, "GL: OpenGL extensions:");
     for (int i = 0; i < numExt; i++) TRACELOG(RL_LOG_INFO, "    %s", glGetStringi(GL_EXTENSIONS, i));
@@ -2021,15 +2066,15 @@ void rlLoadExtensions(void *loader)
     #endif
 
     GLint numExt = 0;
-    const char **extList = RL_MALLOC(512*sizeof(const char *));
+    const char **extList = (const char **)RL_CALLOC(512, sizeof(const char *));
     const char *extensions = (const char *)glGetString(GL_EXTENSIONS);
 
-    int size = strlen(extensions) + 1;
-    char *extensionsDup = (char *)RL_CALLOC(size, sizeof(char));
-    strcpy(extensionsDup, extensions);
+    int extensionsLength = (int)strlen(extensions);
+    char *extensionsDup = (char *)RL_CALLOC(extensionsLength + 1, sizeof(char));
+    strncpy(extensionsDup, extensions, extensionsLength);
     extList[numExt] = extensionsDup;
 
-    for (int i = 0; i < size; i++)
+    for (int i = 0; i < extensionsLength; i++)
     {
         if (extensionsDup[i] == ' ')
         {
@@ -2041,7 +2086,7 @@ void rlLoadExtensions(void *loader)
 
     TRACELOG(RL_LOG_INFO, "GL: Supported extensions count: %i", numExt);
 
-#if defined(RLGL_SHOW_GL_DETAILS_INFO)
+#if RLGL_SHOW_GL_DETAILS_INFO
     TRACELOG(RL_LOG_INFO, "GL: OpenGL extensions:");
     for (int i = 0; i < numExt; i++) TRACELOG(RL_LOG_INFO, "    %s", extList[i]);
 #endif
@@ -2059,7 +2104,7 @@ void rlLoadExtensions(void *loader)
             if ((glGenVertexArrays != NULL) && (glBindVertexArray != NULL) && (glDeleteVertexArrays != NULL)) RLGL.ExtSupported.vao = true;
         }
 
-        if (strstr(extList[i], (const char*)"instanced_arrays") != NULL)
+        if (strstr(extList[i], (const char *)"instanced_arrays") != NULL)
         {
 
             if (strcmp(extList[i], (const char *)"GL_ANGLE_instanced_arrays") == 0)
@@ -2091,7 +2136,7 @@ void rlLoadExtensions(void *loader)
                 glDrawArraysInstanced = (PFNGLDRAWARRAYSINSTANCEDEXTPROC)((rlglLoadProc)loader)("glDrawArraysInstancedEXT");
                 glDrawElementsInstanced = (PFNGLDRAWELEMENTSINSTANCEDEXTPROC)((rlglLoadProc)loader)("glDrawElementsInstancedEXT");
             }
-            else if (strcmp(extList[i], (const char*)"GL_NV_draw_instanced") == 0)
+            else if (strcmp(extList[i], (const char *)"GL_NV_draw_instanced") == 0)
             {
                 glDrawArraysInstanced = (PFNGLDRAWARRAYSINSTANCEDEXTPROC)((rlglLoadProc)loader)("glDrawArraysInstancedNV");
                 glDrawElementsInstanced = (PFNGLDRAWELEMENTSINSTANCEDEXTPROC)((rlglLoadProc)loader)("glDrawElementsInstancedNV");
@@ -2141,13 +2186,14 @@ void rlLoadExtensions(void *loader)
     TRACELOG(RL_LOG_INFO, "    > GLSL:     %s", glGetString(GL_SHADING_LANGUAGE_VERSION));
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
+    RLGL.loader = (rlglLoadProc)loader;
 
     #ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT
         #define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
     #endif
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &RLGL.ExtSupported.maxAnisotropyLevel);
 
-#if defined(RLGL_SHOW_GL_DETAILS_INFO)
+#if RLGL_SHOW_GL_DETAILS_INFO
 
     TRACELOG(RL_LOG_INFO, "GL: OpenGL capabilities:");
     GLint capability = 0;
@@ -2179,6 +2225,7 @@ void rlLoadExtensions(void *loader)
     glGetIntegerv(GL_MAX_UNIFORM_LOCATIONS, &capability);
     TRACELOG(RL_LOG_INFO, "    GL_MAX_UNIFORM_LOCATIONS: %i", capability);
 #endif
+
 #else
 
     if (RLGL.ExtSupported.vao) TRACELOG(RL_LOG_INFO, "GL: VAO extension detected, VAO functions loaded successfully");
@@ -2197,10 +2244,22 @@ void rlLoadExtensions(void *loader)
 #endif
 }
 
+void *rlGetProcAddress(const char *procName)
+{
+    void *func = NULL;
+#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
+    func = RLGL.loader(procName);
+#endif
+    return func;
+}
+
 int rlGetVersion(void)
 {
     int glVersion = 0;
-#if defined(GRAPHICS_API_OPENGL_11)
+
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+    glVersion = RL_OPENGL_SOFTWARE;
+#elif defined(GRAPHICS_API_OPENGL_11)
     glVersion = RL_OPENGL_11;
 #endif
 #if defined(GRAPHICS_API_OPENGL_21)
@@ -2281,24 +2340,25 @@ int *rlGetShaderLocsDefault(void)
 rlRenderBatch rlLoadRenderBatch(int numBuffers, int bufferElements)
 {
     rlRenderBatch batch = { 0 };
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return batch; }
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
 
-    batch.vertexBuffer = (rlVertexBuffer *)RL_MALLOC(numBuffers*sizeof(rlVertexBuffer));
+    batch.vertexBuffer = (rlVertexBuffer *)RL_CALLOC(numBuffers, sizeof(rlVertexBuffer));
 
     for (int i = 0; i < numBuffers; i++)
     {
         batch.vertexBuffer[i].elementCount = bufferElements;
 
-        batch.vertexBuffer[i].vertices = (float *)RL_MALLOC(bufferElements*3*4*sizeof(float));
-        batch.vertexBuffer[i].texcoords = (float *)RL_MALLOC(bufferElements*2*4*sizeof(float));
-        batch.vertexBuffer[i].normals = (float *)RL_MALLOC(bufferElements*3*4*sizeof(float));
-        batch.vertexBuffer[i].colors = (unsigned char *)RL_MALLOC(bufferElements*4*4*sizeof(unsigned char));
+        batch.vertexBuffer[i].vertices = (float *)RL_CALLOC(bufferElements*3*4, sizeof(float));
+        batch.vertexBuffer[i].texcoords = (float *)RL_CALLOC(bufferElements*2*4, sizeof(float));
+        batch.vertexBuffer[i].normals = (float *)RL_CALLOC(bufferElements*3*4, sizeof(float));
+        batch.vertexBuffer[i].colors = (unsigned char *)RL_CALLOC(bufferElements*4*4, sizeof(unsigned char));
 #if defined(GRAPHICS_API_OPENGL_33)
-        batch.vertexBuffer[i].indices = (unsigned int *)RL_MALLOC(bufferElements*6*sizeof(unsigned int));
+        batch.vertexBuffer[i].indices = (unsigned int *)RL_CALLOC(bufferElements*6, sizeof(unsigned int));
 #endif
 #if defined(GRAPHICS_API_OPENGL_ES2)
-        batch.vertexBuffer[i].indices = (unsigned short *)RL_MALLOC(bufferElements*6*sizeof(unsigned short));
+        batch.vertexBuffer[i].indices = (unsigned short *)RL_CALLOC(bufferElements*6, sizeof(unsigned short));
 #endif
 
         for (int j = 0; j < (3*4*bufferElements); j++) batch.vertexBuffer[i].vertices[j] = 0.0f;
@@ -2372,7 +2432,7 @@ rlRenderBatch rlLoadRenderBatch(int numBuffers, int bufferElements)
 
     if (RLGL.ExtSupported.vao) glBindVertexArray(0);
 
-    batch.draws = (rlDrawCall *)RL_MALLOC(RL_DEFAULT_BATCH_DRAWCALLS*sizeof(rlDrawCall));
+    batch.draws = (rlDrawCall *)RL_CALLOC(RL_DEFAULT_BATCH_DRAWCALLS, sizeof(rlDrawCall));
 
     for (int i = 0; i < RL_DEFAULT_BATCH_DRAWCALLS; i++)
     {
@@ -2642,12 +2702,14 @@ bool rlCheckRenderBatchLimit(int vCount)
 unsigned int rlLoadTexture(const void *data, int width, int height, int format, int mipmapCount)
 {
     unsigned int id = 0;
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return id; }
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
 #if defined(GRAPHICS_API_OPENGL_11)
     if (format >= RL_PIXELFORMAT_COMPRESSED_DXT1_RGB)
     {
+
         TRACELOG(RL_LOG_WARNING, "GL: OpenGL 1.1 does not support GPU compressed texture formats");
         return id;
     }
@@ -2694,6 +2756,7 @@ unsigned int rlLoadTexture(const void *data, int width, int height, int format, 
     int mipWidth = width;
     int mipHeight = height;
     int mipOffset = 0;
+    (void)mipOffset;
 
     unsigned char *dataPtr = NULL;
     if (data != NULL) dataPtr = (unsigned char *)data;
@@ -2705,7 +2768,7 @@ unsigned int rlLoadTexture(const void *data, int width, int height, int format, 
         unsigned int glInternalFormat, glFormat, glType;
         rlGetGlTextureFormats(format, &glInternalFormat, &glFormat, &glType);
 
-        TRACELOGD("TEXTURE: Load mipmap level %i (%i x %i), size: %i, offset: %i", i, mipWidth, mipHeight, mipSize, mipOffset);
+        TRACELOG(RL_LOG_DEBUG, "TEXTURE: Load mipmap level %i (%i x %i), size: %i, offset: %i", i, mipWidth, mipHeight, mipSize, mipOffset);
 
         if (glInternalFormat != 0)
         {
@@ -2768,6 +2831,10 @@ unsigned int rlLoadTexture(const void *data, int width, int height, int format, 
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmapCount - 1);
+
     }
 #endif
 
@@ -2782,6 +2849,7 @@ unsigned int rlLoadTexture(const void *data, int width, int height, int format, 
 unsigned int rlLoadTextureDepth(int width, int height, bool useRenderBuffer)
 {
     unsigned int id = 0;
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return id; }
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
 
@@ -2789,7 +2857,7 @@ unsigned int rlLoadTextureDepth(int width, int height, bool useRenderBuffer)
 
     unsigned int glInternalFormat = GL_DEPTH_COMPONENT;
 
-#if (defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_ES3))
+#if defined(GRAPHICS_API_OPENGL_ES2)
 
     if (!RLGL.ExtSupported.texDepthWebGL || useRenderBuffer)
     {
@@ -2797,6 +2865,11 @@ unsigned int rlLoadTextureDepth(int width, int height, bool useRenderBuffer)
         else if (RLGL.ExtSupported.maxDepthBits == 24) glInternalFormat = GL_DEPTH_COMPONENT24_OES;
         else glInternalFormat = GL_DEPTH_COMPONENT16;
     }
+#endif
+#if defined(GRAPHICS_API_OPENGL_ES3)
+
+    if (RLGL.ExtSupported.maxDepthBits == 24) glInternalFormat = GL_DEPTH_COMPONENT24;
+    else glInternalFormat = GL_DEPTH_COMPONENT16;
 #endif
 
     if (!useRenderBuffer && RLGL.ExtSupported.texDepth)
@@ -2825,6 +2898,12 @@ unsigned int rlLoadTextureDepth(int width, int height, bool useRenderBuffer)
 
         TRACELOG(RL_LOG_INFO, "TEXTURE: [ID %i] Depth renderbuffer loaded successfully (%i bits)", id, (RLGL.ExtSupported.maxDepthBits >= 24)? RLGL.ExtSupported.maxDepthBits : 16);
     }
+#elif defined(GRAPHICS_API_OPENGL_SOFTWARE)
+
+    glGenRenderbuffers(1, &id);
+    glBindRenderbuffer(GL_RENDERBUFFER, id);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
 #endif
 
     return id;
@@ -2833,6 +2912,7 @@ unsigned int rlLoadTextureDepth(int width, int height, bool useRenderBuffer)
 unsigned int rlLoadTextureCubemap(const void *data, int size, int format, int mipmapCount)
 {
     unsigned int id = 0;
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return id; }
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
     int mipSize = size;
@@ -3014,6 +3094,8 @@ void rlUnloadTexture(unsigned int id)
 
 void rlGenTextureMipmaps(unsigned int id, int width, int height, int format, int *mipmaps)
 {
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return; }
+
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
     glBindTexture(GL_TEXTURE_2D, id);
 
@@ -3056,7 +3138,7 @@ void *rlReadTexturePixels(unsigned int id, int width, int height, int format)
 
     if ((glInternalFormat != 0) && (format < RL_PIXELFORMAT_COMPRESSED_DXT1_RGB))
     {
-        pixels = RL_MALLOC(size);
+        pixels = RL_CALLOC(size, 1);
         glGetTexImage(GL_TEXTURE_2D, 0, glFormat, glType, pixels);
     }
     else TRACELOG(RL_LOG_WARNING, "TEXTURE: [ID %i] Data retrieval not suported for pixel format (%i)", id, format);
@@ -3073,7 +3155,7 @@ void *rlReadTexturePixels(unsigned int id, int width, int height, int format)
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, id, 0);
 
-    pixels = (unsigned char *)RL_MALLOC(rlGetPixelDataSize(width, height, RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8));
+    pixels = RL_CALLOC(rlGetPixelDataSize(width, height, RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8), 1);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -3084,25 +3166,50 @@ void *rlReadTexturePixels(unsigned int id, int width, int height, int format)
     return pixels;
 }
 
+void rlCopyFramebuffer(int x, int y, int width, int height, int format, void *pixels)
+{
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+    unsigned int glInternalFormat, glFormat, glType;
+    rlGetGlTextureFormats(format, &glInternalFormat, &glFormat, &glType);
+    swReadPixels(x, y, width, height, glFormat, glType, pixels);
+#endif
+}
+
+void rlResizeFramebuffer(int width, int height)
+{
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+    swResize(width, height);
+#endif
+}
+
 unsigned char *rlReadScreenPixels(int width, int height)
 {
-    unsigned char *screenData = (unsigned char *)RL_CALLOC(width*height*4, sizeof(unsigned char));
+    unsigned char *imgData = (unsigned char *)RL_CALLOC(width*height*4, sizeof(unsigned char));
 
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, screenData);
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, imgData);
 
-    unsigned char *imgData = (unsigned char *)RL_MALLOC(width*height*4*sizeof(unsigned char));
-
-    for (int y = height - 1; y >= 0; y--)
+    for (int y = height - 1; y >= height/2; y--)
     {
-        for (int x = 0; x < (width*4); x++)
+        for (int x = 0; x < (width*4); x += 4)
         {
-            imgData[((height - 1) - y)*width*4 + x] = screenData[(y*width*4) + x];
+            unsigned int s = ((height - 1) - y)*width*4 + x;
+            unsigned int e = y*width*4 + x;
 
-            if (((x + 1)%4) == 0) imgData[((height - 1) - y)*width*4 + x] = 255;
+            unsigned char r = imgData[s];
+            unsigned char g = imgData[s+1];
+            unsigned char b = imgData[s+2];
+
+            imgData[s] = imgData[e];
+            imgData[s+1] = imgData[e+1];
+            imgData[s+2] = imgData[e+2];
+            imgData[s+3] = 255;
+
+            imgData[e] = r;
+            imgData[e+1] = g;
+            imgData[e+2] = b;
+            imgData[e+3] = 255;
         }
     }
-
-    RL_FREE(screenData);
 
     return imgData;
 }
@@ -3110,8 +3217,9 @@ unsigned char *rlReadScreenPixels(int width, int height)
 unsigned int rlLoadFramebuffer(void)
 {
     unsigned int fboId = 0;
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return fboId; }
 
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)) && defined(RLGL_RENDER_TEXTURES_HINT)
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
     glGenFramebuffers(1, &fboId);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 #endif
@@ -3119,10 +3227,10 @@ unsigned int rlLoadFramebuffer(void)
     return fboId;
 }
 
-void rlFramebufferAttach(unsigned int fboId, unsigned int texId, int attachType, int texType, int mipLevel)
+void rlFramebufferAttach(unsigned int id, unsigned int texId, int attachType, int texType, int mipLevel)
 {
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)) && defined(RLGL_RENDER_TEXTURES_HINT)
-    glBindFramebuffer(GL_FRAMEBUFFER, fboId);
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
+    glBindFramebuffer(GL_FRAMEBUFFER, id);
 
     switch (attachType)
     {
@@ -3138,19 +3246,16 @@ void rlFramebufferAttach(unsigned int fboId, unsigned int texId, int attachType,
             if (texType == RL_ATTACHMENT_TEXTURE2D) glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + attachType, GL_TEXTURE_2D, texId, mipLevel);
             else if (texType == RL_ATTACHMENT_RENDERBUFFER) glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + attachType, GL_RENDERBUFFER, texId);
             else if (texType >= RL_ATTACHMENT_CUBEMAP_POSITIVE_X) glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + attachType, GL_TEXTURE_CUBE_MAP_POSITIVE_X + texType, texId, mipLevel);
-
         } break;
         case RL_ATTACHMENT_DEPTH:
         {
             if (texType == RL_ATTACHMENT_TEXTURE2D) glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texId, mipLevel);
             else if (texType == RL_ATTACHMENT_RENDERBUFFER)  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, texId);
-
         } break;
         case RL_ATTACHMENT_STENCIL:
         {
             if (texType == RL_ATTACHMENT_TEXTURE2D) glFramebufferTexture2D(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texId, mipLevel);
             else if (texType == RL_ATTACHMENT_RENDERBUFFER)  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, texId);
-
         } break;
         default: break;
     }
@@ -3163,7 +3268,7 @@ bool rlFramebufferComplete(unsigned int id)
 {
     bool result = false;
 
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)) && defined(RLGL_RENDER_TEXTURES_HINT)
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
     glBindFramebuffer(GL_FRAMEBUFFER, id);
 
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -3192,12 +3297,13 @@ bool rlFramebufferComplete(unsigned int id)
 
 void rlUnloadFramebuffer(unsigned int id)
 {
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)) && defined(RLGL_RENDER_TEXTURES_HINT)
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
 
-    int depthType = 0, depthId = 0;
+    int depthType = 0;
     glBindFramebuffer(GL_FRAMEBUFFER, id);
     glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &depthType);
 
+    int depthId = 0;
     glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &depthId);
 
     unsigned int depthIdU = (unsigned int)depthId;
@@ -3214,6 +3320,7 @@ void rlUnloadFramebuffer(unsigned int id)
 unsigned int rlLoadVertexBuffer(const void *buffer, int size, bool dynamic)
 {
     unsigned int id = 0;
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return id; }
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
     glGenBuffers(1, &id);
@@ -3227,6 +3334,7 @@ unsigned int rlLoadVertexBuffer(const void *buffer, int size, bool dynamic)
 unsigned int rlLoadVertexBufferElement(const void *buffer, int size, bool dynamic)
 {
     unsigned int id = 0;
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return id; }
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
     glGenBuffers(1, &id);
@@ -3332,7 +3440,7 @@ void rlDrawVertexArrayElements(int offset, int count, const void *buffer)
 void rlDrawVertexArrayInstanced(int offset, int count, int instances)
 {
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
-    glDrawArraysInstanced(GL_TRIANGLES, 0, count, instances);
+    glDrawArraysInstanced(GL_TRIANGLES, offset, count, instances);
 #endif
 }
 
@@ -3347,10 +3455,9 @@ void rlDrawVertexArrayElementsInstanced(int offset, int count, const void *buffe
 #endif
 }
 
-#if defined(GRAPHICS_API_OPENGL_11)
-
 void rlEnableStatePointer(int vertexAttribType, void *buffer)
 {
+#if defined(GRAPHICS_API_OPENGL_11)
     if (buffer != NULL) glEnableClientState(vertexAttribType);
     switch (vertexAttribType)
     {
@@ -3361,23 +3468,25 @@ void rlEnableStatePointer(int vertexAttribType, void *buffer)
 
         default: break;
     }
+#endif
 }
 
 void rlDisableStatePointer(int vertexAttribType)
 {
+#if defined(GRAPHICS_API_OPENGL_11)
     glDisableClientState(vertexAttribType);
-}
 #endif
+}
 
 unsigned int rlLoadVertexArray(void)
 {
     unsigned int vaoId = 0;
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return vaoId; }
+
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
-    if (RLGL.ExtSupported.vao)
-    {
-        glGenVertexArrays(1, &vaoId);
-    }
+    if (RLGL.ExtSupported.vao) glGenVertexArrays(1, &vaoId);
 #endif
+
     return vaoId;
 }
 
@@ -3417,25 +3526,88 @@ void rlUnloadVertexBuffer(unsigned int vboId)
 #endif
 }
 
-unsigned int rlLoadShaderCode(const char *vsCode, const char *fsCode)
+unsigned int rlLoadShader(const char *code, int type)
+{
+    unsigned int shaderId = 0;
+
+#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
+    shaderId = glCreateShader(type);
+    glShaderSource(shaderId, 1, &code, NULL);
+
+    GLint success = 0;
+    glCompileShader(shaderId);
+    glGetShaderiv(shaderId, GL_COMPILE_STATUS, &success);
+
+    if (success == GL_FALSE)
+    {
+        switch (type)
+        {
+            case GL_VERTEX_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to compile vertex shader code", shaderId); break;
+            case GL_FRAGMENT_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to compile fragment shader code", shaderId); break;
+
+        #if defined(GRAPHICS_API_OPENGL_43)
+            case GL_COMPUTE_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to compile compute shader code", shaderId); break;
+        #elif defined(GRAPHICS_API_OPENGL_33)
+            case GL_COMPUTE_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: Compute shaders not enabled. Define GRAPHICS_API_OPENGL_43", shaderId); break;
+        #endif
+            default: break;
+        }
+
+        int maxLength = 0;
+        glGetShaderiv(shaderId, GL_INFO_LOG_LENGTH, &maxLength);
+
+        if (maxLength > 0)
+        {
+            int length = 0;
+            char *log = (char *)RL_CALLOC(maxLength, sizeof(char));
+            glGetShaderInfoLog(shaderId, maxLength, &length, log);
+            TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Compile error: %s", shaderId, log);
+            RL_FREE(log);
+        }
+
+        glDeleteShader(shaderId);
+        shaderId = 0;
+    }
+    else
+    {
+        switch (type)
+        {
+            case GL_VERTEX_SHADER: TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Vertex shader compiled successfully", shaderId); break;
+            case GL_FRAGMENT_SHADER: TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Fragment shader compiled successfully", shaderId); break;
+
+        #if defined(GRAPHICS_API_OPENGL_43)
+            case GL_COMPUTE_SHADER: TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Compute shader compiled successfully", shaderId); break;
+        #elif defined(GRAPHICS_API_OPENGL_33)
+            case GL_COMPUTE_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: Compute shaders not enabled. Define GRAPHICS_API_OPENGL_43", shaderId); break;
+        #endif
+            default: break;
+        }
+    }
+#endif
+
+    return shaderId;
+}
+
+unsigned int rlLoadShaderProgram(const char *vsCode, const char *fsCode)
 {
     unsigned int id = 0;
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return id; }
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
     unsigned int vertexShaderId = 0;
     unsigned int fragmentShaderId = 0;
 
-    if (vsCode != NULL) vertexShaderId = rlCompileShader(vsCode, GL_VERTEX_SHADER);
+    if (vsCode != NULL) vertexShaderId = rlLoadShader(vsCode, GL_VERTEX_SHADER);
     else vertexShaderId = RLGL.State.defaultVShaderId;
 
-    if (fsCode != NULL) fragmentShaderId = rlCompileShader(fsCode, GL_FRAGMENT_SHADER);
+    if (fsCode != NULL) fragmentShaderId = rlLoadShader(fsCode, GL_FRAGMENT_SHADER);
     else fragmentShaderId = RLGL.State.defaultFShaderId;
 
     if ((vertexShaderId == RLGL.State.defaultVShaderId) && (fragmentShaderId == RLGL.State.defaultFShaderId)) id = RLGL.State.defaultShaderId;
     else if ((vertexShaderId > 0) && (fragmentShaderId > 0))
     {
 
-        id = rlLoadShaderProgram(vertexShaderId, fragmentShaderId);
+        id = rlLoadShaderProgramEx(vertexShaderId, fragmentShaderId);
 
         if (vertexShaderId != RLGL.State.defaultVShaderId)
         {
@@ -3463,121 +3635,114 @@ unsigned int rlLoadShaderCode(const char *vsCode, const char *fsCode)
     return id;
 }
 
-unsigned int rlCompileShader(const char *shaderCode, int type)
+unsigned int rlLoadShaderProgramEx(unsigned int vsId, unsigned int fsId)
 {
-    unsigned int shader = 0;
+    unsigned int programId = 0;
+    if (!isGpuReady) { TRACELOG(RL_LOG_WARNING, "GL: GPU is not ready to load data, trying to load before InitWindow()?"); return programId; }
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
-    shader = glCreateShader(type);
-    glShaderSource(shader, 1, &shaderCode, NULL);
-
     GLint success = 0;
-    glCompileShader(shader);
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    programId = glCreateProgram();
+
+    glAttachShader(programId, vsId);
+    glAttachShader(programId, fsId);
+
+    glBindAttribLocation(programId, RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION, RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION);
+    glBindAttribLocation(programId, RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD, RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD);
+    glBindAttribLocation(programId, RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL);
+    glBindAttribLocation(programId, RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR, RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR);
+    glBindAttribLocation(programId, RL_DEFAULT_SHADER_ATTRIB_LOCATION_TANGENT, RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT);
+    glBindAttribLocation(programId, RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD2, RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2);
+    glBindAttribLocation(programId, RL_DEFAULT_SHADER_ATTRIB_LOCATION_INSTANCETRANSFORM, RL_DEFAULT_SHADER_ATTRIB_NAME_INSTANCETRANSFORM);
+    glBindAttribLocation(programId, RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEINDICES, RL_DEFAULT_SHADER_ATTRIB_NAME_BONEINDICES);
+    glBindAttribLocation(programId, RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEWEIGHTS, RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS);
+
+    glLinkProgram(programId);
+
+    glGetProgramiv(programId, GL_LINK_STATUS, &success);
 
     if (success == GL_FALSE)
     {
-        switch (type)
-        {
-            case GL_VERTEX_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to compile vertex shader code", shader); break;
-            case GL_FRAGMENT_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to compile fragment shader code", shader); break;
-
-        #if defined(GRAPHICS_API_OPENGL_43)
-            case GL_COMPUTE_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to compile compute shader code", shader); break;
-        #elif defined(GRAPHICS_API_OPENGL_33)
-            case GL_COMPUTE_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: Compute shaders not enabled. Define GRAPHICS_API_OPENGL_43", shader); break;
-        #endif
-            default: break;
-        }
+        TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to link shader program", programId);
 
         int maxLength = 0;
-        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
+        glGetProgramiv(programId, GL_INFO_LOG_LENGTH, &maxLength);
 
         if (maxLength > 0)
         {
             int length = 0;
             char *log = (char *)RL_CALLOC(maxLength, sizeof(char));
-            glGetShaderInfoLog(shader, maxLength, &length, log);
-            TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Compile error: %s", shader, log);
+            glGetProgramInfoLog(programId, maxLength, &length, log);
+            TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Link error: %s", programId, log);
             RL_FREE(log);
         }
 
-        shader = 0;
+        glDeleteProgram(programId);
+
+        programId = 0;
     }
     else
     {
-        switch (type)
-        {
-            case GL_VERTEX_SHADER: TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Vertex shader compiled successfully", shader); break;
-            case GL_FRAGMENT_SHADER: TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Fragment shader compiled successfully", shader); break;
 
-        #if defined(GRAPHICS_API_OPENGL_43)
-            case GL_COMPUTE_SHADER: TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Compute shader compiled successfully", shader); break;
-        #elif defined(GRAPHICS_API_OPENGL_33)
-            case GL_COMPUTE_SHADER: TRACELOG(RL_LOG_WARNING, "SHADER: Compute shaders not enabled. Define GRAPHICS_API_OPENGL_43", shader); break;
-        #endif
-            default: break;
-        }
+        TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Program shader loaded successfully", programId);
     }
 #endif
-
-    return shader;
+    return programId;
 }
 
-unsigned int rlLoadShaderProgram(unsigned int vShaderId, unsigned int fShaderId)
+unsigned int rlLoadShaderProgramCompute(unsigned int csId)
 {
-    unsigned int program = 0;
+    unsigned int programId = 0;
 
-#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
+#if defined(GRAPHICS_API_OPENGL_43)
     GLint success = 0;
-    program = glCreateProgram();
+    programId = glCreateProgram();
 
-    glAttachShader(program, vShaderId);
-    glAttachShader(program, fShaderId);
+    glAttachShader(programId, csId);
 
-    glBindAttribLocation(program, RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION, RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION);
-    glBindAttribLocation(program, RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD, RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD);
-    glBindAttribLocation(program, RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL);
-    glBindAttribLocation(program, RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR, RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR);
-    glBindAttribLocation(program, RL_DEFAULT_SHADER_ATTRIB_LOCATION_TANGENT, RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT);
-    glBindAttribLocation(program, RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD2, RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2);
+    glLinkProgram(programId);
 
-#ifdef RL_SUPPORT_MESH_GPU_SKINNING
-    glBindAttribLocation(program, RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEIDS, RL_DEFAULT_SHADER_ATTRIB_NAME_BONEIDS);
-    glBindAttribLocation(program, RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEWEIGHTS, RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS);
-#endif
-
-    glLinkProgram(program);
-
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    glGetProgramiv(programId, GL_LINK_STATUS, &success);
 
     if (success == GL_FALSE)
     {
-        TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to link shader program", program);
+        TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to link compute shader program", programId);
 
         int maxLength = 0;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+        glGetProgramiv(programId, GL_INFO_LOG_LENGTH, &maxLength);
 
         if (maxLength > 0)
         {
             int length = 0;
             char *log = (char *)RL_CALLOC(maxLength, sizeof(char));
-            glGetProgramInfoLog(program, maxLength, &length, log);
-            TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Link error: %s", program, log);
+            glGetProgramInfoLog(programId, maxLength, &length, log);
+            TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Link error: %s", programId, log);
             RL_FREE(log);
         }
 
-        glDeleteProgram(program);
+        glDeleteProgram(programId);
 
-        program = 0;
+        programId = 0;
     }
     else
     {
 
-        TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Program shader loaded successfully", program);
+        TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Compute shader program loaded successfully", programId);
     }
+#else
+    TRACELOG(RL_LOG_WARNING, "SHADER: Compute shaders not supported, enable GRAPHICS_API_OPENGL_43");
 #endif
-    return program;
+
+    return programId;
+}
+
+void rlUnloadShader(unsigned int id)
+{
+#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
+    glDeleteShader(id);
+
+    TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Unloaded shader data from VRAM (GPU)", id);
+#endif
 }
 
 void rlUnloadShaderProgram(unsigned int id)
@@ -3589,21 +3754,21 @@ void rlUnloadShaderProgram(unsigned int id)
 #endif
 }
 
-int rlGetLocationUniform(unsigned int shaderId, const char *uniformName)
+int rlGetLocationUniform(unsigned int id, const char *uniformName)
 {
     int location = -1;
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
-    location = glGetUniformLocation(shaderId, uniformName);
+    location = glGetUniformLocation(id, uniformName);
 
 #endif
     return location;
 }
 
-int rlGetLocationAttrib(unsigned int shaderId, const char *attribName)
+int rlGetLocationAttrib(unsigned int id, const char *attribName)
 {
     int location = -1;
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
-    location = glGetAttribLocation(shaderId, attribName);
+    location = glGetAttribLocation(id, attribName);
 
 #endif
     return location;
@@ -3630,7 +3795,6 @@ void rlSetUniform(int locIndex, const void *value, int uniformType, int count)
     #endif
         case RL_SHADER_UNIFORM_SAMPLER2D: glUniform1iv(locIndex, count, (int *)value); break;
         default: TRACELOG(RL_LOG_WARNING, "SHADER: Failed to set uniform value, data type not recognized");
-
     }
 #endif
 }
@@ -3652,13 +3816,7 @@ void rlSetVertexAttributeDefault(int locIndex, const void *value, int attribType
 void rlSetUniformMatrix(int locIndex, Matrix mat)
 {
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
-    float matfloat[16] = {
-        mat.m0, mat.m1, mat.m2, mat.m3,
-        mat.m4, mat.m5, mat.m6, mat.m7,
-        mat.m8, mat.m9, mat.m10, mat.m11,
-        mat.m12, mat.m13, mat.m14, mat.m15
-    };
-    glUniformMatrix4fv(locIndex, 1, false, matfloat);
+    glUniformMatrix4fv(locIndex, 1, false, rlMatrixToFloat(mat));
 #endif
 }
 
@@ -3709,50 +3867,6 @@ void rlSetShader(unsigned int id, int *locs)
 #endif
 }
 
-unsigned int rlLoadComputeShaderProgram(unsigned int shaderId)
-{
-    unsigned int program = 0;
-
-#if defined(GRAPHICS_API_OPENGL_43)
-    GLint success = 0;
-    program = glCreateProgram();
-    glAttachShader(program, shaderId);
-    glLinkProgram(program);
-
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-
-    if (success == GL_FALSE)
-    {
-        TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Failed to link compute shader program", program);
-
-        int maxLength = 0;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
-
-        if (maxLength > 0)
-        {
-            int length = 0;
-            char *log = (char *)RL_CALLOC(maxLength, sizeof(char));
-            glGetProgramInfoLog(program, maxLength, &length, log);
-            TRACELOG(RL_LOG_WARNING, "SHADER: [ID %i] Link error: %s", program, log);
-            RL_FREE(log);
-        }
-
-        glDeleteProgram(program);
-
-        program = 0;
-    }
-    else
-    {
-
-        TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Compute shader program loaded successfully", program);
-    }
-#else
-    TRACELOG(RL_LOG_WARNING, "SHADER: Compute shaders not enabled. Define GRAPHICS_API_OPENGL_43");
-#endif
-
-    return program;
-}
-
 void rlComputeShaderDispatch(unsigned int groupX, unsigned int groupY, unsigned int groupZ)
 {
 #if defined(GRAPHICS_API_OPENGL_43)
@@ -3784,7 +3898,6 @@ void rlUnloadShaderBuffer(unsigned int ssboId)
 #else
     TRACELOG(RL_LOG_WARNING, "SSBO: SSBO not enabled. Define GRAPHICS_API_OPENGL_43");
 #endif
-
 }
 
 void rlUpdateShaderBuffer(unsigned int id, const void *data, unsigned int dataSize, unsigned int offset)
@@ -3797,14 +3910,14 @@ void rlUpdateShaderBuffer(unsigned int id, const void *data, unsigned int dataSi
 
 unsigned int rlGetShaderBufferSize(unsigned int id)
 {
+    unsigned int result = 0;
 #if defined(GRAPHICS_API_OPENGL_43)
     GLint64 size = 0;
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, id);
     glGetBufferParameteri64v(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &size);
-    return (size > 0)? (unsigned int)size : 0;
-#else
-    return 0;
+    if (size > 0) result = (unsigned int)size;
 #endif
+    return result;
 }
 
 void rlReadShaderBuffer(unsigned int id, void *dest, unsigned int count, unsigned int offset)
@@ -4200,10 +4313,10 @@ static void rlLoadShaderDefault(void)
     "}                                  \n";
 #endif
 
-    RLGL.State.defaultVShaderId = rlCompileShader(defaultVShaderCode, GL_VERTEX_SHADER);
-    RLGL.State.defaultFShaderId = rlCompileShader(defaultFShaderCode, GL_FRAGMENT_SHADER);
+    RLGL.State.defaultVShaderId = rlLoadShader(defaultVShaderCode, GL_VERTEX_SHADER);
+    RLGL.State.defaultFShaderId = rlLoadShader(defaultFShaderCode, GL_FRAGMENT_SHADER);
 
-    RLGL.State.defaultShaderId = rlLoadShaderProgram(RLGL.State.defaultVShaderId, RLGL.State.defaultFShaderId);
+    RLGL.State.defaultShaderId = rlLoadShaderProgramEx(RLGL.State.defaultVShaderId, RLGL.State.defaultFShaderId);
 
     if (RLGL.State.defaultShaderId > 0)
     {
@@ -4236,7 +4349,7 @@ static void rlUnloadShaderDefault(void)
     TRACELOG(RL_LOG_INFO, "SHADER: [ID %i] Default shader unloaded successfully", RLGL.State.defaultShaderId);
 }
 
-#if defined(RLGL_SHOW_GL_DETAILS_INFO)
+#if RLGL_SHOW_GL_DETAILS_INFO
 
 static const char *rlGetCompressedFormatName(int format)
 {
@@ -4339,26 +4452,51 @@ static int rlGetPixelDataSize(int width, int height, int format)
         case RL_PIXELFORMAT_COMPRESSED_ETC1_RGB:
         case RL_PIXELFORMAT_COMPRESSED_ETC2_RGB:
         case RL_PIXELFORMAT_COMPRESSED_PVRT_RGB:
-        case RL_PIXELFORMAT_COMPRESSED_PVRT_RGBA: bpp = 4; break;
+        case RL_PIXELFORMAT_COMPRESSED_PVRT_RGBA:
+        {
+            int blockWidth = (width + 3)/4;
+            int blockHeight = (height + 3)/4;
+            dataSize = blockWidth*blockHeight*8;
+        } break;
         case RL_PIXELFORMAT_COMPRESSED_DXT3_RGBA:
         case RL_PIXELFORMAT_COMPRESSED_DXT5_RGBA:
         case RL_PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA:
-        case RL_PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA: bpp = 8; break;
-        case RL_PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA: bpp = 2; break;
+        case RL_PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA:
+        {
+            int blockWidth = (width + 3)/4;
+            int blockHeight = (height + 3)/4;
+            dataSize = blockWidth*blockHeight*16;
+        } break;
+        case RL_PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA:
+        {
+            int blockWidth = (width + 3)/4;
+            int blockHeight = (height + 3)/4;
+            dataSize = blockWidth*blockHeight*4;
+        } break;
         default: break;
     }
 
-    double bytesPerPixel = (double)bpp/8.0;
-    dataSize = (int)(bytesPerPixel*width*height);
-
-    if ((width < 4) && (height < 4))
+    if ((format >= RL_PIXELFORMAT_UNCOMPRESSED_GRAYSCALE) &&
+        (format <= RL_PIXELFORMAT_UNCOMPRESSED_R16G16B16A16))
     {
-        if ((format >= RL_PIXELFORMAT_COMPRESSED_DXT1_RGB) && (format < RL_PIXELFORMAT_COMPRESSED_DXT3_RGBA)) dataSize = 8;
-        else if ((format >= RL_PIXELFORMAT_COMPRESSED_DXT3_RGBA) && (format < RL_PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA)) dataSize = 16;
+        double bytesPerPixel = (double)bpp/8.0;
+        dataSize = (int)(bytesPerPixel*width*height);
     }
 
     return dataSize;
 }
+
+static Matrix rlMatrixIdentity(void)
+{
+    Matrix matIdentity = { 0 };
+    matIdentity.m0 = 1.0f;
+    matIdentity.m5 = 1.0f;
+    matIdentity.m10 = 1.0f;
+    matIdentity.m15 = 1.0f;
+
+    return matIdentity;
+}
+#if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
 
 static rl_float16 rlMatrixToFloatV(Matrix mat)
 {
@@ -4380,18 +4518,6 @@ static rl_float16 rlMatrixToFloatV(Matrix mat)
     result.v[13] = mat.m13;
     result.v[14] = mat.m14;
     result.v[15] = mat.m15;
-
-    return result;
-}
-
-static Matrix rlMatrixIdentity(void)
-{
-    Matrix result = {
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f
-    };
 
     return result;
 }
@@ -4487,5 +4613,6 @@ static Matrix rlMatrixInvert(Matrix mat)
 
     return result;
 }
+#endif
 
 #endif
