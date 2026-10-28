@@ -2045,10 +2045,30 @@ RMAPI Quaternion QuaternionFromVector3ToVector3(Vector3 from, Vector3 to)
     float cos2Theta = (from.x*to.x + from.y*to.y + from.z*to.z);
     Vector3 cross = { from.y*to.z - from.z*to.y, from.z*to.x - from.x*to.z, from.x*to.y - from.y*to.x };
 
+    float lengths = sqrtf(cross.x*cross.x + cross.y*cross.y + cross.z*cross.z + cos2Theta*cos2Theta);
+
     result.x = cross.x;
     result.y = cross.y;
     result.z = cross.z;
-    result.w = sqrtf(cross.x*cross.x + cross.y*cross.y + cross.z*cross.z + cos2Theta*cos2Theta) + cos2Theta;
+    result.w = lengths + cos2Theta;
+
+    if ((lengths > 0.0f) && (result.w <= lengths*EPSILON))
+    {
+        if (fabsf(from.x) > fabsf(from.z))
+        {
+            result.x = -from.y;
+            result.y = from.x;
+            result.z = 0.0f;
+        }
+        else
+        {
+            result.x = 0.0f;
+            result.y = -from.z;
+            result.z = from.y;
+        }
+
+        result.w = 0.0f;
+    }
 
     Quaternion q = result;
     float length = sqrtf(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w);
@@ -2305,13 +2325,35 @@ RMAPI Matrix MatrixCompose(Vector3 translation, Quaternion rotation, Vector3 sca
     Vector3 up = { 0.0f, 1.0f, 0.0f };
     Vector3 forward = { 0.0f, 0.0f, 1.0f };
 
-    right = Vector3Scale(right, scale.x);
-    up = Vector3Scale(up, scale.y);
-    forward = Vector3Scale(forward , scale.z);
+    right.x *= scale.x;
+    right.y *= scale.x;
+    right.z *= scale.x;
 
-    right = Vector3RotateByQuaternion(right, rotation);
-    up = Vector3RotateByQuaternion(up, rotation);
-    forward = Vector3RotateByQuaternion(forward, rotation);
+    up.x *= scale.y;
+    up.y *= scale.y;
+    up.z *= scale.y;
+
+    forward.x *= scale.z;
+    forward.y *= scale.z;
+    forward.z *= scale.z;
+
+    Vector3 temp = right;
+
+    right.x = temp.x*(rotation.x*rotation.x + rotation.w*rotation.w - rotation.y*rotation.y - rotation.z*rotation.z) + temp.y*(2*rotation.x*rotation.y - 2*rotation.w*rotation.z) + temp.z*(2*rotation.x*rotation.z + 2*rotation.w*rotation.y);
+    right.y = temp.x*(2*rotation.w*rotation.z + 2*rotation.x*rotation.y) + temp.y*(rotation.w*rotation.w - rotation.x*rotation.x + rotation.y*rotation.y - rotation.z*rotation.z) + temp.z*(-2*rotation.w*rotation.x + 2*rotation.y*rotation.z);
+    right.z = temp.x*(-2*rotation.w*rotation.y + 2*rotation.x*rotation.z) + temp.y*(2*rotation.w*rotation.x + 2*rotation.y*rotation.z)+ temp.z*(rotation.w*rotation.w - rotation.x*rotation.x - rotation.y*rotation.y + rotation.z*rotation.z);
+
+    temp = up;
+
+    up.x = temp.x*(rotation.x*rotation.x + rotation.w*rotation.w -  rotation.y*rotation.y - rotation.z*rotation.z) + temp.y*(2*rotation.x*rotation.y - 2*rotation.w*rotation.z) + temp.z*(2*rotation.x*rotation.z + 2*rotation.w*rotation.y);
+    up.y = temp.x*(2*rotation.w*rotation.z + 2*rotation.x*rotation.y) + temp.y*(rotation.w*rotation.w - rotation.x*rotation.x + rotation.y*rotation.y - rotation.z*rotation.z) + temp.z*(-2*rotation.w*rotation.x + 2*rotation.y*rotation.z);
+    up.z = temp.x*(-2*rotation.w*rotation.y + 2*rotation.x*rotation.z) + temp.y*(2*rotation.w*rotation.x + 2*rotation.y*rotation.z)+ temp.z*(rotation.w*rotation.w - rotation.x*rotation.x - rotation.y*rotation.y + rotation.z*rotation.z);
+
+    temp = forward;
+
+    forward.x = temp.x*(rotation.x*rotation.x + rotation.w*rotation.w -  rotation.y*rotation.y - rotation.z*rotation.z) + temp.y*(2*rotation.x*rotation.y - 2*rotation.w*rotation.z) + temp.z*(2*rotation.x*rotation.z + 2*rotation.w*rotation.y);
+    forward.y = temp.x*(2*rotation.w*rotation.z + 2*rotation.x*rotation.y) + temp.y*(rotation.w*rotation.w - rotation.x*rotation.x + rotation.y*rotation.y - rotation.z*rotation.z) + temp.z*(-2*rotation.w*rotation.x + 2*rotation.y*rotation.z);
+    forward.z = temp.x*(-2*rotation.w*rotation.y + 2*rotation.x*rotation.z) + temp.y*(2*rotation.w*rotation.x + 2*rotation.y*rotation.z)+ temp.z*(rotation.w*rotation.w - rotation.x*rotation.x - rotation.y*rotation.y + rotation.z*rotation.z);
 
     Matrix result = {
         right.x, up.x, forward.x, translation.x,
@@ -2331,9 +2373,9 @@ RMAPI void MatrixDecompose(Matrix mat, Vector3 *translation, Quaternion *rotatio
     translation->y = mat.m13;
     translation->z = mat.m14;
 
-    Vector3 matColumns[3] = {{ mat.m0, mat.m4, mat.m8 },
-                             { mat.m1, mat.m5, mat.m9 },
-                             { mat.m2, mat.m6, mat.m10 }};
+    Vector3 matColumns[3] = {{ mat.m0, mat.m1, mat.m2 },
+                             { mat.m4, mat.m5, mat.m6 },
+                             { mat.m8, mat.m9, mat.m10 }};
 
     float shear[3] = { 0 };
 
@@ -2346,12 +2388,12 @@ RMAPI void MatrixDecompose(Matrix mat, Vector3 *translation, Quaternion *rotatio
         stabilizer = fmaxf(stabilizer, fabsf(matColumns[i].y));
         stabilizer = fmaxf(stabilizer, fabsf(matColumns[i].z));
     }
-    matColumns[0] = Vector3Scale(matColumns[0], 1.0f / stabilizer);
-    matColumns[1] = Vector3Scale(matColumns[1], 1.0f / stabilizer);
-    matColumns[2] = Vector3Scale(matColumns[2], 1.0f / stabilizer);
+    matColumns[0] = Vector3Scale(matColumns[0], 1.0f/stabilizer);
+    matColumns[1] = Vector3Scale(matColumns[1], 1.0f/stabilizer);
+    matColumns[2] = Vector3Scale(matColumns[2], 1.0f/stabilizer);
 
     scl.x = Vector3Length(matColumns[0]);
-    if (scl.x > eps) matColumns[0] = Vector3Scale(matColumns[0], 1.0f / scl.x);
+    if (scl.x > eps) matColumns[0] = Vector3Scale(matColumns[0], 1.0f/scl.x);
 
     shear[0] = Vector3DotProduct(matColumns[0], matColumns[1]);
     matColumns[1] = Vector3Subtract(matColumns[1], Vector3Scale(matColumns[0], shear[0]));
@@ -2359,7 +2401,7 @@ RMAPI void MatrixDecompose(Matrix mat, Vector3 *translation, Quaternion *rotatio
     scl.y = Vector3Length(matColumns[1]);
     if (scl.y > eps)
     {
-        matColumns[1] = Vector3Scale(matColumns[1], 1.0f / scl.y);
+        matColumns[1] = Vector3Scale(matColumns[1], 1.0f/scl.y);
         shear[0] /= scl.y;
     }
 
@@ -2371,7 +2413,7 @@ RMAPI void MatrixDecompose(Matrix mat, Vector3 *translation, Quaternion *rotatio
     scl.z = Vector3Length(matColumns[2]);
     if (scl.z > eps)
     {
-        matColumns[2] = Vector3Scale(matColumns[2], 1.0f / scl.z);
+        matColumns[2] = Vector3Scale(matColumns[2], 1.0f/scl.z);
         shear[1] /= scl.z;
         shear[2] /= scl.z;
     }
@@ -2386,10 +2428,10 @@ RMAPI void MatrixDecompose(Matrix mat, Vector3 *translation, Quaternion *rotatio
 
     *scale = Vector3Scale(scl, stabilizer);
 
-    Matrix rotationMatrix = { matColumns[0].x, matColumns[0].y, matColumns[0].z, 0,
-                             matColumns[1].x, matColumns[1].y, matColumns[1].z, 0,
-                             matColumns[2].x, matColumns[2].y, matColumns[2].z, 0,
-                             0, 0, 0, 1 };
+    Matrix rotationMatrix = { matColumns[0].x, matColumns[1].x, matColumns[2].x, 0,
+                              matColumns[0].y, matColumns[1].y, matColumns[2].y, 0,
+                              matColumns[0].z, matColumns[1].z, matColumns[2].z, 0,
+                              0, 0, 0, 1 };
     *rotation = QuaternionFromMatrix(rotationMatrix);
 }
 
@@ -2420,6 +2462,11 @@ inline const Vector2& operator -= (Vector2& lhs, const Vector2& rhs)
 {
     lhs = Vector2Subtract(lhs, rhs);
     return lhs;
+}
+
+inline Vector2 operator * (const float& lhs, const Vector2& rhs)
+{
+    return Vector2Scale(rhs, lhs);
 }
 
 inline Vector2 operator * (const Vector2& lhs, const float& rhs)
@@ -2515,6 +2562,11 @@ inline const Vector3& operator -= (Vector3& lhs, const Vector3& rhs)
     return lhs;
 }
 
+inline Vector3 operator * (const float& lhs, const Vector3& rhs)
+{
+    return Vector3Scale(rhs, lhs);
+}
+
 inline Vector3 operator * (const Vector3& lhs, const float& rhs)
 {
     return Vector3Scale(lhs, rhs);
@@ -2607,6 +2659,11 @@ inline const Vector4& operator -= (Vector4& lhs, const Vector4& rhs)
 {
     lhs = Vector4Subtract(lhs, rhs);
     return lhs;
+}
+
+inline Vector4 operator * (const float& lhs, const Vector4& rhs)
+{
+    return Vector4Scale(rhs, lhs);
 }
 
 inline Vector4 operator * (const Vector4& lhs, const float& rhs)

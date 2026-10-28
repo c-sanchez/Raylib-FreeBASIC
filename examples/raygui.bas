@@ -8,31 +8,34 @@ SetTargetFPS(60)
 Dim showMessageBox As Boolean = false
 
 Do Until WindowShouldClose()
-    ' Dibujar
-    '----------------------------------------------------------------------------------
-    BeginDrawing()
-        
-        ' Obtenemos el color de fondo del estilo por defecto
-        ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)))
+  ' Dibujar
+  '----------------------------------------------------------------------------------
+  BeginDrawing()
+    
+    ' Obtenemos el color de fondo del estilo por defecto
+    ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)))
 
-        ' Botón para mostrar el mensaje
-        ' Usamos Type<Rectangle> para definir la estructura en la llamada
-        If GuiButton(Type<Rectangle>(24, 24, 120, 30), "#191#Show Message") Then
-            showMessageBox = true
-        End If
+    ' Botón para mostrar el mensaje
+    ' Usamos Type<Rectangle> para definir la estructura en la llamada
+    If GuiButton(Type<Rectangle>(24, 24, 120, 30), "#191#Show Message") Then
+      showMessageBox = true
+    End If
 
-        If showMessageBox Then
-            ' GuiMessageBox devuelve un entero (long) indicando el botón presionado
-            Dim result As Long = GuiMessageBox(Type<Rectangle>(85, 70, 250, 100), _
-                                               "#191#Message Box", _
-                                               "Hi! This is a message!", _
-                                               "Nice;Cool")
+    If showMessageBox Then
+      Dim btnActive As Long = 0
 
-            ' Si result >= 0 significa que se presionó algún botón o se cerró
-            If result >= 0 Then showMessageBox = false
-        End If
+      ' En raygui 5.0 se requiere el puntero @btnActive para devolver el botón seleccionado
+      Dim result As Long = GuiMessageBox(Type<Rectangle>(85, 70, 250, 100), _
+                                         "#191#Message Box", _
+                                         "Hi! This is a message!", _
+                                         "Nice;Cool", _
+                                         @btnActive)
 
-    EndDrawing()
+      ' Si result = 1 (RESULT_PRESSED) significa que se presionó un botón o se cerró
+      If result = 1 Then showMessageBox = false
+    End If
+
+  EndDrawing()
 Loop
 
 CloseWindow()

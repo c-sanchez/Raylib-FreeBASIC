@@ -38,7 +38,7 @@ if exist "%C_LIB_32%\libraylib.a" if not exist "%FB_LIB_32%\libraylib.a" copy /Y
 :: =========================================================================
 echo.
 echo [x64] Compilando ejemplo (Estatico)...
-call fbc64 "%SRC%" -x "%OUT_DIR_64%\raygui.exe" -i "%FB_INC%" -p "%FB_LIB_64%"
+call fbc "%SRC%" -x "%OUT_DIR_64%\raygui.exe" -i "%FB_INC%" -p "%FB_LIB_64%"
 
 if %ERRORLEVEL% EQU 0 (
     echo [OK] x64 Compilado.

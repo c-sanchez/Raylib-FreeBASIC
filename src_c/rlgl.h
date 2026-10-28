@@ -217,11 +217,13 @@
     #define RL_DEFAULT_SHADER_ATTRIB_LOCATION_INSTANCETRANSFORM 9
 #endif
 
+#if !defined(__cplusplus)
 #if (defined(__STDC__) && __STDC_VERSION__ >= 199901L) || (defined(_MSC_VER) && _MSC_VER >= 1800)
     #include <stdbool.h>
-#elif !defined(__cplusplus) && !defined(bool) && !defined(RL_BOOL_TYPE)
-
-typedef enum bool { false = 0, true = !false } bool;
+#elif !defined(bool)
+    typedef enum bool { false = 0, true = !false } bool;
+    #define RL_BOOL_TYPE
+#endif
 #endif
 
 #if !defined(RL_MATRIX_TYPE)
@@ -690,6 +692,7 @@ RLAPI void rlLoadDrawQuad(void);
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <limits.h>
 
 #ifndef PI
     #define PI 3.14159265358979323846f
@@ -770,68 +773,31 @@ RLAPI void rlLoadDrawQuad(void);
     #if !defined(GRAPHICS_API_OPENGL_ES3)
         #define GL_READ_FRAMEBUFFER         GL_FRAMEBUFFER
         #define GL_DRAW_FRAMEBUFFER         GL_FRAMEBUFFER
+        #define GL_DRAW_FRAMEBUFFER_BINDING GL_FRAMEBUFFER_BINDING
     #endif
 #endif
 
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION     "vertexPosition"
-#endif
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD     "vertexTexCoord"
-#endif
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL       "vertexNormal"
-#endif
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR        "vertexColor"
-#endif
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT      "vertexTangent"
-#endif
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2    "vertexTexCoord2"
-#endif
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_BONEINDICES
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_BONEINDICES  "vertexBoneIndices"
-#endif
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS  "vertexBoneWeights"
-#endif
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION          "vertexPosition"
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD          "vertexTexCoord"
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL            "vertexNormal"
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR             "vertexColor"
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT           "vertexTangent"
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2         "vertexTexCoord2"
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_BONEINDICES       "vertexBoneIndices"
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS       "vertexBoneWeights"
+#define RL_DEFAULT_SHADER_ATTRIB_NAME_INSTANCETRANSFORM "instanceTransform"
 
-#ifndef RL_DEFAULT_SHADER_ATTRIB_NAME_INSTANCETRANSFORM
-    #define RL_DEFAULT_SHADER_ATTRIB_NAME_INSTANCETRANSFORM "instanceTransform"
-#endif
+#define RL_DEFAULT_SHADER_UNIFORM_NAME_MVP              "mvp"
+#define RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW             "matView"
+#define RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION       "matProjection"
+#define RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL            "matModel"
+#define RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL           "matNormal"
+#define RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR            "colDiffuse"
+#define RL_DEFAULT_SHADER_UNIFORM_NAME_BONEMATRICES     "boneMatrices"
 
-#ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_MVP
-    #define RL_DEFAULT_SHADER_UNIFORM_NAME_MVP         "mvp"
-#endif
-#ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW
-    #define RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW        "matView"
-#endif
-#ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION
-    #define RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION  "matProjection"
-#endif
-#ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL
-    #define RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL       "matModel"
-#endif
-#ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL
-    #define RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL      "matNormal"
-#endif
-#ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR
-    #define RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR       "colDiffuse"
-#endif
-#ifndef RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0
-    #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0  "texture0"
-#endif
-#ifndef RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1
-    #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1  "texture1"
-#endif
-#ifndef RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2
-    #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2  "texture2"
-#endif
-#ifndef RL_DEFAULT_SHADER_UNIFORM_NAME_BONEMATRICES
-    #define RL_DEFAULT_SHADER_UNIFORM_NAME_BONEMATRICES "boneMatrices"
-#endif
+#define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0       "texture0"
+#define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1       "texture1"
+#define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2       "texture2"
 
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
 
@@ -997,7 +963,11 @@ void rlMatrixMode(int mode)
 
 void rlPushMatrix(void)
 {
-    if (RLGL.State.stackCounter >= RL_MAX_MATRIX_STACK_SIZE) TRACELOG(RL_LOG_ERROR, "RLGL: Matrix stack overflow (RL_MAX_MATRIX_STACK_SIZE)");
+    if (RLGL.State.stackCounter >= RL_MAX_MATRIX_STACK_SIZE)
+    {
+        TRACELOG(RL_LOG_ERROR, "RLGL: Matrix stack overflow (RL_MAX_MATRIX_STACK_SIZE)");
+        return;
+    }
 
     if (RLGL.State.currentMatrixMode == RL_MODELVIEW)
     {
@@ -1546,7 +1516,7 @@ void rlEnableFramebuffer(unsigned int id)
 unsigned int rlGetActiveFramebuffer(void)
 {
     GLint fboId = 0;
-#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES3) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
+#if (defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_SOFTWARE))
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fboId);
 #endif
     return fboId;
@@ -2071,7 +2041,7 @@ void rlLoadExtensions(void *loader)
 
     int extensionsLength = (int)strlen(extensions);
     char *extensionsDup = (char *)RL_CALLOC(extensionsLength + 1, sizeof(char));
-    strncpy(extensionsDup, extensions, extensionsLength);
+    snprintf(extensionsDup, extensionsLength, "%s", extensions);
     extList[numExt] = extensionsDup;
 
     for (int i = 0; i < extensionsLength; i++)
@@ -2709,7 +2679,6 @@ unsigned int rlLoadTexture(const void *data, int width, int height, int format, 
 #if defined(GRAPHICS_API_OPENGL_11)
     if (format >= RL_PIXELFORMAT_COMPRESSED_DXT1_RGB)
     {
-
         TRACELOG(RL_LOG_WARNING, "GL: OpenGL 1.1 does not support GPU compressed texture formats");
         return id;
     }
@@ -2806,7 +2775,12 @@ unsigned int rlLoadTexture(const void *data, int width, int height, int format, 
 
 #if defined(GRAPHICS_API_OPENGL_ES2)
 
-    if (RLGL.ExtSupported.texNPOT)
+    bool texIsPOT = false;
+
+    if (((width > 0) && ((width & (width - 1)) == 0)) &&
+        ((height > 0) && ((height & (height - 1)) == 0))) texIsPOT = true;
+
+    if ((texIsPOT) || (RLGL.ExtSupported.texNPOT))
     {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -2950,8 +2924,8 @@ unsigned int rlLoadTextureCubemap(const void *data, int size, int format, int mi
             }
             else
             {
-                if (format < RL_PIXELFORMAT_COMPRESSED_DXT1_RGB) glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, mipmapLevel, glInternalFormat, mipSize, mipSize, 0, glFormat, glType, (unsigned char *)dataPtr + face*dataSize);
-                else glCompressedTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, mipmapLevel, glInternalFormat, mipSize, mipSize, 0, dataSize, (unsigned char *)dataPtr + face*dataSize);
+                if (format < RL_PIXELFORMAT_COMPRESSED_DXT1_RGB) glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, mipmapLevel, glInternalFormat, mipSize, mipSize, 0, glFormat, glType, dataPtr + face*dataSize);
+                else glCompressedTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, mipmapLevel, glInternalFormat, mipSize, mipSize, 0, dataSize, dataPtr + face*dataSize);
             }
 
 #if defined(GRAPHICS_API_OPENGL_33)
@@ -3155,8 +3129,17 @@ void *rlReadTexturePixels(unsigned int id, int width, int height, int format)
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, id, 0);
 
+#if defined(FBO_READ_TEXTURE_AS_RGBA)
+
     pixels = RL_CALLOC(rlGetPixelDataSize(width, height, RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8), 1);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+#else
+
+    pixels = (unsigned char *)RL_MALLOC(rlGetPixelDataSize(width, height, format));
+    unsigned int glInternalFormat = 0, glFormat = 0, glType = 0;
+    rlGetGlTextureFormats(format, &glInternalFormat, &glFormat, &glType);
+    glReadPixels(0, 0, width, height, glFormat, glType, pixels);
+#endif
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -4236,7 +4219,7 @@ static void rlLoadShaderDefault(void)
 
 #if defined(GRAPHICS_API_OPENGL_ES3)
     "#version 300 es                    \n"
-    "precision mediump float;           \n"
+    "precision highp float;             \n"
     "in vec3 vertexPosition;            \n"
     "in vec2 vertexTexCoord;            \n"
     "in vec4 vertexColor;               \n"
@@ -4244,7 +4227,7 @@ static void rlLoadShaderDefault(void)
     "out vec4 fragColor;                \n"
 #elif defined(GRAPHICS_API_OPENGL_ES2)
     "#version 100                       \n"
-    "precision mediump float;           \n"
+    "precision highp float;             \n"
     "attribute vec3 vertexPosition;     \n"
     "attribute vec2 vertexTexCoord;     \n"
     "attribute vec4 vertexColor;        \n"
@@ -4288,7 +4271,11 @@ static void rlLoadShaderDefault(void)
 
 #if defined(GRAPHICS_API_OPENGL_ES3)
     "#version 300 es                    \n"
+    "#ifdef GL_FRAGMENT_PRECISION_HIGH  \n"
+    "precision highp float;             \n"
+    "#else                              \n"
     "precision mediump float;           \n"
+    "#endif                             \n"
     "in vec2 fragTexCoord;              \n"
     "in vec4 fragColor;                 \n"
     "out vec4 finalColor;               \n"
@@ -4301,7 +4288,11 @@ static void rlLoadShaderDefault(void)
     "}                                  \n";
 #elif defined(GRAPHICS_API_OPENGL_ES2)
     "#version 100                       \n"
+    "#ifdef GL_FRAGMENT_PRECISION_HIGH  \n"
+    "precision highp float;             \n"
+    "#else                              \n"
     "precision mediump float;           \n"
+    "#endif                             \n"
     "varying vec2 fragTexCoord;         \n"
     "varying vec4 fragColor;            \n"
     "uniform sampler2D texture0;        \n"
@@ -4432,6 +4423,8 @@ static int rlGetPixelDataSize(int width, int height, int format)
     int dataSize = 0;
     int bpp = 0;
 
+    if ((width <= 0) || (height <= 0)) return dataSize;
+
     switch (format)
     {
         case RL_PIXELFORMAT_UNCOMPRESSED_GRAYSCALE: bpp = 8; break;
@@ -4456,7 +4449,9 @@ static int rlGetPixelDataSize(int width, int height, int format)
         {
             int blockWidth = (width + 3)/4;
             int blockHeight = (height + 3)/4;
-            dataSize = blockWidth*blockHeight*8;
+            unsigned long long dataSizeBytes = (unsigned long long)blockWidth*blockHeight*8;
+            if (dataSizeBytes < INT_MAX) dataSize = (int)dataSizeBytes;
+
         } break;
         case RL_PIXELFORMAT_COMPRESSED_DXT3_RGBA:
         case RL_PIXELFORMAT_COMPRESSED_DXT5_RGBA:
@@ -4465,13 +4460,17 @@ static int rlGetPixelDataSize(int width, int height, int format)
         {
             int blockWidth = (width + 3)/4;
             int blockHeight = (height + 3)/4;
-            dataSize = blockWidth*blockHeight*16;
+            unsigned long long dataSizeBytes = (unsigned long long)blockWidth*blockHeight*16;
+            if (dataSizeBytes < INT_MAX) dataSize = (int)dataSizeBytes;
+
         } break;
         case RL_PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA:
         {
             int blockWidth = (width + 3)/4;
             int blockHeight = (height + 3)/4;
-            dataSize = blockWidth*blockHeight*4;
+            unsigned long long dataSizeBytes = (unsigned long long)blockWidth*blockHeight*4;
+            if (dataSizeBytes < INT_MAX) dataSize = (int)dataSizeBytes;
+
         } break;
         default: break;
     }
@@ -4479,8 +4478,9 @@ static int rlGetPixelDataSize(int width, int height, int format)
     if ((format >= RL_PIXELFORMAT_UNCOMPRESSED_GRAYSCALE) &&
         (format <= RL_PIXELFORMAT_UNCOMPRESSED_R16G16B16A16))
     {
-        double bytesPerPixel = (double)bpp/8.0;
-        dataSize = (int)(bytesPerPixel*width*height);
+        unsigned long long dataSizeBytes = ((unsigned long long)width*height*bpp) >> 3;
+        if (dataSizeBytes < INT_MAX) dataSize = (int)dataSizeBytes;
+        else TRACELOG(LOG_WARNING, "Requested image size is larger than 2GB, it can not be allocated");
     }
 
     return dataSize;

@@ -5,9 +5,9 @@
 #include <stdarg.h>
 
 #define RAYLIB_VERSION_MAJOR 6
-#define RAYLIB_VERSION_MINOR 0
+#define RAYLIB_VERSION_MINOR 2
 #define RAYLIB_VERSION_PATCH 0
-#define RAYLIB_VERSION  "6.0"
+#define RAYLIB_VERSION  "6.2"
 
 #if defined(_WIN32)
     #if defined(__TINYC__)
@@ -97,11 +97,13 @@
 #define MAGENTA    CLITERAL(Color){ 255, 0, 255, 255 }
 #define RAYWHITE   CLITERAL(Color){ 245, 245, 245, 255 }
 
+#if !defined(__cplusplus)
 #if (defined(__STDC__) && __STDC_VERSION__ >= 199901L) || (defined(_MSC_VER) && _MSC_VER >= 1800)
     #include <stdbool.h>
-#elif !defined(__cplusplus) && !defined(bool)
+#elif !defined(bool)
     typedef enum bool { false = 0, true = !false } bool;
     #define RL_BOOL_TYPE
+#endif
 #endif
 
 typedef struct Vector2 {
@@ -270,7 +272,7 @@ typedef struct BoneInfo {
 } BoneInfo;
 
 typedef struct ModelSkeleton {
-    int boneCount;
+    unsigned int boneCount;
     BoneInfo *bones;
     ModelAnimPose bindPose;
 } ModelSkeleton;
@@ -293,7 +295,7 @@ typedef struct Model {
 typedef struct ModelAnimation {
     char name[32];
 
-    int boneCount;
+    unsigned int boneCount;
     int keyframeCount;
     ModelAnimPose *keyframePoses;
 } ModelAnimation;
@@ -773,7 +775,7 @@ typedef enum {
 
 typedef void (*TraceLogCallback)(int logLevel, const char *text, va_list args);
 typedef unsigned char *(*LoadFileDataCallback)(const char *fileName, int *dataSize);
-typedef bool (*SaveFileDataCallback)(const char *fileName, void *data, int dataSize);
+typedef bool (*SaveFileDataCallback)(const char *fileName, const void *data, int dataSize);
 typedef char *(*LoadFileTextCallback)(const char *fileName);
 typedef bool (*SaveFileTextCallback)(const char *fileName, const char *text);
 
@@ -870,7 +872,6 @@ RLAPI void SetShaderValueMatrix(Shader shader, int locIndex, Matrix mat);
 RLAPI void SetShaderValueTexture(Shader shader, int locIndex, Texture2D texture);
 RLAPI void UnloadShader(Shader shader);
 
-#define GetMouseRay GetScreenToWorldRay
 RLAPI Ray GetScreenToWorldRay(Vector2 position, Camera camera);
 RLAPI Ray GetScreenToWorldRayEx(Vector2 position, Camera camera, int width, int height);
 RLAPI Vector2 GetWorldToScreen(Vector3 position, Camera camera);
@@ -908,7 +909,7 @@ RLAPI void MemFree(void *ptr);
 
 RLAPI unsigned char *LoadFileData(const char *fileName, int *dataSize);
 RLAPI void UnloadFileData(unsigned char *data);
-RLAPI bool SaveFileData(const char *fileName, void *data, int dataSize);
+RLAPI bool SaveFileData(const char *fileName, const void *data, int dataSize);
 RLAPI bool ExportDataAsCode(const unsigned char *data, int dataSize, const char *fileName);
 RLAPI char *LoadFileText(const char *fileName);
 RLAPI void UnloadFileText(char *text);
@@ -928,6 +929,7 @@ RLAPI int FileTextFindIndex(const char *fileName, const char *search);
 RLAPI bool FileExists(const char *fileName);
 RLAPI bool DirectoryExists(const char *dirPath);
 RLAPI bool IsFileExtension(const char *fileName, const char *ext);
+RLAPI bool IsFileHidden(const char *filePath);
 RLAPI int GetFileLength(const char *fileName);
 RLAPI long GetFileModTime(const char *fileName);
 RLAPI const char *GetFileExtension(const char *fileName);
@@ -938,8 +940,10 @@ RLAPI const char *GetPrevDirectoryPath(const char *dirPath);
 RLAPI const char *GetWorkingDirectory(void);
 RLAPI const char *GetApplicationDirectory(void);
 RLAPI int MakeDirectory(const char *dirPath);
-RLAPI bool ChangeDirectory(const char *dirPath);
+RLAPI int ChangeDirectory(const char *dirPath);
 RLAPI bool IsPathFile(const char *path);
+RLAPI bool IsPathDirectory(const char *path);
+RLAPI bool IsPathAbsolute(const char *path);
 RLAPI bool IsFileNameValid(const char *fileName);
 RLAPI FilePathList LoadDirectoryFiles(const char *dirPath);
 RLAPI FilePathList LoadDirectoryFilesEx(const char *basePath, const char *filter, bool scanSubdirs);
@@ -954,10 +958,10 @@ RLAPI unsigned char *CompressData(const unsigned char *data, int dataSize, int *
 RLAPI unsigned char *DecompressData(const unsigned char *compData, int compDataSize, int *dataSize);
 RLAPI char *EncodeDataBase64(const unsigned char *data, int dataSize, int *outputSize);
 RLAPI unsigned char *DecodeDataBase64(const char *text, int *outputSize);
-RLAPI unsigned int ComputeCRC32(unsigned char *data, int dataSize);
-RLAPI unsigned int *ComputeMD5(unsigned char *data, int dataSize);
-RLAPI unsigned int *ComputeSHA1(unsigned char *data, int dataSize);
-RLAPI unsigned int *ComputeSHA256(unsigned char *data, int dataSize);
+RLAPI unsigned int ComputeCRC32(const unsigned char *data, int dataSize);
+RLAPI unsigned int *ComputeMD5(const unsigned char *data, int dataSize);
+RLAPI unsigned int *ComputeSHA1(const unsigned char *data, int dataSize);
+RLAPI unsigned int *ComputeSHA256(const unsigned char *data, int dataSize);
 
 RLAPI AutomationEventList LoadAutomationEventList(const char *fileName);
 RLAPI void UnloadAutomationEventList(AutomationEventList list);
@@ -1023,7 +1027,7 @@ RLAPI float GetGesturePinchAngle(void);
 RLAPI void UpdateCamera(Camera *camera, int mode);
 RLAPI void UpdateCameraPro(Camera *camera, Vector3 movement, Vector3 rotation, float zoom);
 
-RLAPI void SetShapesTexture(Texture2D texture, Rectangle source);
+RLAPI void SetShapesTexture(Texture2D texture, Rectangle rec);
 RLAPI Texture2D GetShapesTexture(void);
 RLAPI Rectangle GetShapesTextureRectangle(void);
 
@@ -1035,38 +1039,44 @@ RLAPI void DrawLineEx(Vector2 startPos, Vector2 endPos, float thick, Color color
 RLAPI void DrawLineStrip(const Vector2 *points, int pointCount, Color color);
 RLAPI void DrawLineBezier(Vector2 startPos, Vector2 endPos, float thick, Color color);
 RLAPI void DrawLineDashed(Vector2 startPos, Vector2 endPos, int dashSize, int spaceSize, Color color);
-RLAPI void DrawCircle(int centerX, int centerY, float radius, Color color);
-RLAPI void DrawCircleV(Vector2 center, float radius, Color color);
-RLAPI void DrawCircleGradient(Vector2 center, float radius, Color inner, Color outer);
-RLAPI void DrawCircleSector(Vector2 center, float radius, float startAngle, float endAngle, int segments, Color color);
-RLAPI void DrawCircleSectorLines(Vector2 center, float radius, float startAngle, float endAngle, int segments, Color color);
-RLAPI void DrawCircleLines(int centerX, int centerY, float radius, Color color);
-RLAPI void DrawCircleLinesV(Vector2 center, float radius, Color color);
-RLAPI void DrawEllipse(int centerX, int centerY, float radiusH, float radiusV, Color color);
-RLAPI void DrawEllipseV(Vector2 center, float radiusH, float radiusV, Color color);
-RLAPI void DrawEllipseLines(int centerX, int centerY, float radiusH, float radiusV, Color color);
-RLAPI void DrawEllipseLinesV(Vector2 center, float radiusH, float radiusV, Color color);
-RLAPI void DrawRing(Vector2 center, float innerRadius, float outerRadius, float startAngle, float endAngle, int segments, Color color);
-RLAPI void DrawRingLines(Vector2 center, float innerRadius, float outerRadius, float startAngle, float endAngle, int segments, Color color);
+RLAPI void DrawTriangle(Vector2 v1, Vector2 v2, Vector2 v3, Color color);
+RLAPI void DrawTriangleGradient(Vector2 v1, Vector2 v2, Vector2 v3, Color c1, Color c2, Color c3);
+RLAPI void DrawTriangleLines(Vector2 v1, Vector2 v2, Vector2 v3, Color color);
+RLAPI void DrawTriangleLinesEx(Vector2 v1, Vector2 v2, Vector2 v3, float thick, Color color);
+RLAPI void DrawTriangleFan(const Vector2 *points, int pointCount, Color color);
+RLAPI void DrawTriangleStrip(const Vector2 *points, int pointCount, Color color);
 RLAPI void DrawRectangle(int posX, int posY, int width, int height, Color color);
 RLAPI void DrawRectangleV(Vector2 position, Vector2 size, Color color);
 RLAPI void DrawRectangleRec(Rectangle rec, Color color);
 RLAPI void DrawRectanglePro(Rectangle rec, Vector2 origin, float rotation, Color color);
 RLAPI void DrawRectangleGradientV(int posX, int posY, int width, int height, Color top, Color bottom);
 RLAPI void DrawRectangleGradientH(int posX, int posY, int width, int height, Color left, Color right);
-RLAPI void DrawRectangleGradientEx(Rectangle rec, Color topLeft, Color bottomLeft, Color bottomRight, Color topRight);
+RLAPI void DrawRectangleGradientEx(Rectangle rec, Color col1, Color col2, Color col3, Color col4);
 RLAPI void DrawRectangleLines(int posX, int posY, int width, int height, Color color);
-RLAPI void DrawRectangleLinesEx(Rectangle rec, float lineThick, Color color);
+RLAPI void DrawRectangleLinesEx(Rectangle rec, float thick, Color color);
 RLAPI void DrawRectangleRounded(Rectangle rec, float roundness, int segments, Color color);
 RLAPI void DrawRectangleRoundedLines(Rectangle rec, float roundness, int segments, Color color);
-RLAPI void DrawRectangleRoundedLinesEx(Rectangle rec, float roundness, int segments, float lineThick, Color color);
-RLAPI void DrawTriangle(Vector2 v1, Vector2 v2, Vector2 v3, Color color);
-RLAPI void DrawTriangleLines(Vector2 v1, Vector2 v2, Vector2 v3, Color color);
-RLAPI void DrawTriangleFan(const Vector2 *points, int pointCount, Color color);
-RLAPI void DrawTriangleStrip(const Vector2 *points, int pointCount, Color color);
+RLAPI void DrawRectangleRoundedLinesEx(Rectangle rec, float roundness, int segments, float thick, Color color);
 RLAPI void DrawPoly(Vector2 center, int sides, float radius, float rotation, Color color);
 RLAPI void DrawPolyLines(Vector2 center, int sides, float radius, float rotation, Color color);
-RLAPI void DrawPolyLinesEx(Vector2 center, int sides, float radius, float rotation, float lineThick, Color color);
+RLAPI void DrawPolyLinesEx(Vector2 center, int sides, float radius, float rotation, float thick, Color color);
+RLAPI void DrawCircle(int centerX, int centerY, float radius, Color color);
+RLAPI void DrawCircleV(Vector2 center, float radius, Color color);
+RLAPI void DrawCircleGradient(Vector2 center, float radius, Color inner, Color outer);
+RLAPI void DrawCircleSector(Vector2 center, float radius, float startAngle, float endAngle, int segments, Color color);
+RLAPI void DrawCircleSectorLines(Vector2 center, float radius, float startAngle, float endAngle, int segments, Color color);
+RLAPI void DrawCircleSectorLinesEx(Vector2 center, float radius, float startAngle, float endAngle, int segments, float thick, Color color);
+RLAPI void DrawCircleLines(int centerX, int centerY, float radius, Color color);
+RLAPI void DrawCircleLinesV(Vector2 center, float radius, Color color);
+RLAPI void DrawCircleLinesEx(Vector2 center, float radius, float thick, Color color);
+RLAPI void DrawEllipse(int centerX, int centerY, float radiusH, float radiusV, Color color);
+RLAPI void DrawEllipseV(Vector2 center, float radiusH, float radiusV, Color color);
+RLAPI void DrawEllipseLines(int centerX, int centerY, float radiusH, float radiusV, Color color);
+RLAPI void DrawEllipseLinesV(Vector2 center, float radiusH, float radiusV, Color color);
+RLAPI void DrawEllipseLinesEx(Vector2 center, float radiusH, float radiusV, float thick, Color color);
+RLAPI void DrawRing(Vector2 center, float innerRadius, float outerRadius, float startAngle, float endAngle, int segments, Color color);
+RLAPI void DrawRingLines(Vector2 center, float innerRadius, float outerRadius, float startAngle, float endAngle, int segments, Color color);
+RLAPI void DrawRingLinesEx(Vector2 center, float innerRadius, float outerRadius, float startAngle, float endAngle, int segments, float thick, Color color);
 
 RLAPI void DrawSplineLinear(const Vector2 *points, int pointCount, float thick, Color color);
 RLAPI void DrawSplineBasis(const Vector2 *points, int pointCount, float thick, Color color);
@@ -1082,7 +1092,7 @@ RLAPI void DrawSplineSegmentBezierCubic(Vector2 p1, Vector2 c2, Vector2 c3, Vect
 RLAPI Vector2 GetSplinePointLinear(Vector2 startPos, Vector2 endPos, float t);
 RLAPI Vector2 GetSplinePointBasis(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, float t);
 RLAPI Vector2 GetSplinePointCatmullRom(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, float t);
-RLAPI Vector2 GetSplinePointBezierQuad(Vector2 p1, Vector2 c2, Vector2 p3, float t);
+RLAPI Vector2 GetSplinePointBezierQuadratic(Vector2 p1, Vector2 c2, Vector2 p3, float t);
 RLAPI Vector2 GetSplinePointBezierCubic(Vector2 p1, Vector2 c2, Vector2 c3, Vector2 p4, float t);
 
 RLAPI bool CheckCollisionRecs(Rectangle rec1, Rectangle rec2);
@@ -1147,7 +1157,7 @@ RLAPI void ImageRotateCCW(Image *image);
 RLAPI void ImageColorTint(Image *image, Color color);
 RLAPI void ImageColorInvert(Image *image);
 RLAPI void ImageColorGrayscale(Image *image);
-RLAPI void ImageColorContrast(Image *image, float contrast);
+RLAPI void ImageColorContrast(Image *image, int contrast);
 RLAPI void ImageColorBrightness(Image *image, int brightness);
 RLAPI void ImageColorReplace(Image *image, Color color, Color replace);
 RLAPI Color *LoadImageColors(Image image);
@@ -1163,27 +1173,38 @@ RLAPI void ImageDrawPixelV(Image *dst, Vector2 position, Color color);
 RLAPI void ImageDrawLine(Image *dst, int startPosX, int startPosY, int endPosX, int endPosY, Color color);
 RLAPI void ImageDrawLineV(Image *dst, Vector2 start, Vector2 end, Color color);
 RLAPI void ImageDrawLineEx(Image *dst, Vector2 start, Vector2 end, int thick, Color color);
+RLAPI void ImageDrawLineStrip(Image *dst, const Vector2 *points, int pointCount, Color color);
+RLAPI void ImageDrawTriangle(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color color);
+RLAPI void ImageDrawTriangleGradient(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color c1, Color c2, Color c3);
+RLAPI void ImageDrawTriangleLines(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color color);
+RLAPI void ImageDrawTriangleFan(Image *dst, const Vector2 *points, int pointCount, Color color);
+RLAPI void ImageDrawTriangleStrip(Image *dst, const Vector2 *points, int pointCount, Color color);
+RLAPI void ImageDrawRectangle(Image *dst, int posX, int posY, int width, int height, Color color);
+RLAPI void ImageDrawRectangleV(Image *dst, Vector2 position, Vector2 size, Color color);
+RLAPI void ImageDrawRectangleRec(Image *dst, Rectangle rec, Color color);
+RLAPI void ImageDrawRectanglePro(Image *dst, Rectangle rec, Vector2 origin, float rotation, Color color);
+RLAPI void ImageDrawRectangleLines(Image *dst, int posX, int posY, int width, int height, Color color);
+RLAPI void ImageDrawRectangleLinesEx(Image *dst, Rectangle rec, int thick, Color color);
+RLAPI void ImageDrawRectangleGradientEx(Image *dst, Rectangle rec, Color col1, Color col2, Color col3, Color col4);
 RLAPI void ImageDrawCircle(Image *dst, int centerX, int centerY, int radius, Color color);
 RLAPI void ImageDrawCircleV(Image *dst, Vector2 center, int radius, Color color);
 RLAPI void ImageDrawCircleLines(Image *dst, int centerX, int centerY, int radius, Color color);
 RLAPI void ImageDrawCircleLinesV(Image *dst, Vector2 center, int radius, Color color);
-RLAPI void ImageDrawRectangle(Image *dst, int posX, int posY, int width, int height, Color color);
-RLAPI void ImageDrawRectangleV(Image *dst, Vector2 position, Vector2 size, Color color);
-RLAPI void ImageDrawRectangleRec(Image *dst, Rectangle rec, Color color);
-RLAPI void ImageDrawRectangleLines(Image *dst, Rectangle rec, int thick, Color color);
-RLAPI void ImageDrawTriangle(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color color);
-RLAPI void ImageDrawTriangleEx(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color c1, Color c2, Color c3);
-RLAPI void ImageDrawTriangleLines(Image *dst, Vector2 v1, Vector2 v2, Vector2 v3, Color color);
-RLAPI void ImageDrawTriangleFan(Image *dst, const Vector2 *points, int pointCount, Color color);
-RLAPI void ImageDrawTriangleStrip(Image *dst, const Vector2 *points, int pointCount, Color color);
-RLAPI void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color tint);
+RLAPI void ImageDrawCircleGradient(Image *dst, Vector2 center, float radius, Color inner, Color outer);
+
+RLAPI void ImageDrawImage(Image *dst, Image src, int posX, int posY, Color tint);
+RLAPI void ImageDrawImageEx(Image *dst, Image src, Vector2 position, float rotation, float scale, Color tint);
+RLAPI void ImageDrawImageRec(Image *dst, Image src, Rectangle srcRec, Vector2 position, Color tint);
+RLAPI void ImageDrawImagePro(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Vector2 origin, float rotation, Color tint);
 RLAPI void ImageDrawText(Image *dst, const char *text, int posX, int posY, int fontSize, Color color);
 RLAPI void ImageDrawTextEx(Image *dst, Font font, const char *text, Vector2 position, float fontSize, float spacing, Color tint);
+RLAPI void ImageDrawTextPro(Image *dst, Font font, const char *text, Vector2 position, Vector2 origin, float rotation, float fontSize, float spacing, Color tint);
 
 RLAPI Texture2D LoadTexture(const char *fileName);
 RLAPI Texture2D LoadTextureFromImage(Image image);
 RLAPI TextureCubemap LoadTextureCubemap(Image image, int layout);
 RLAPI RenderTexture2D LoadRenderTexture(int width, int height);
+RLAPI RenderTexture2D LoadRenderTextureEx(int width, int height, int format);
 RLAPI bool IsTextureValid(Texture2D texture);
 RLAPI void UnloadTexture(Texture2D texture);
 RLAPI bool IsRenderTextureValid(RenderTexture2D target);
@@ -1198,9 +1219,9 @@ RLAPI void SetTextureWrap(Texture2D texture, int wrap);
 RLAPI void DrawTexture(Texture2D texture, int posX, int posY, Color tint);
 RLAPI void DrawTextureV(Texture2D texture, Vector2 position, Color tint);
 RLAPI void DrawTextureEx(Texture2D texture, Vector2 position, float rotation, float scale, Color tint);
-RLAPI void DrawTextureRec(Texture2D texture, Rectangle source, Vector2 position, Color tint);
-RLAPI void DrawTexturePro(Texture2D texture, Rectangle source, Rectangle dest, Vector2 origin, float rotation, Color tint);
-RLAPI void DrawTextureNPatch(Texture2D texture, NPatchInfo nPatchInfo, Rectangle dest, Vector2 origin, float rotation, Color tint);
+RLAPI void DrawTextureRec(Texture2D texture, Rectangle rec, Vector2 position, Color tint);
+RLAPI void DrawTexturePro(Texture2D texture, Rectangle srcrec, Rectangle dstrec, Vector2 origin, float rotation, Color tint);
+RLAPI void DrawTextureNPatch(Texture2D texture, NPatchInfo nPatchInfo, Rectangle dstrec, Vector2 origin, float rotation, Color tint);
 
 RLAPI bool ColorIsEqual(Color col1, Color col2);
 RLAPI Color Fade(Color color, float alpha);
@@ -1216,7 +1237,7 @@ RLAPI Color ColorAlpha(Color color, float alpha);
 RLAPI Color ColorAlphaBlend(Color dst, Color src, Color tint);
 RLAPI Color ColorLerp(Color color1, Color color2, float factor);
 RLAPI Color GetColor(unsigned int hexValue);
-RLAPI Color GetPixelColor(void *srcPtr, int format);
+RLAPI Color GetPixelColor(const void *srcPtr, int format);
 RLAPI void SetPixelColor(void *dstPtr, Color color, int format);
 RLAPI int GetPixelDataSize(int width, int height, int format);
 
@@ -1296,12 +1317,12 @@ RLAPI void DrawCubeWiresV(Vector3 position, Vector3 size, Color color);
 RLAPI void DrawSphere(Vector3 centerPos, float radius, Color color);
 RLAPI void DrawSphereEx(Vector3 centerPos, float radius, int rings, int slices, Color color);
 RLAPI void DrawSphereWires(Vector3 centerPos, float radius, int rings, int slices, Color color);
-RLAPI void DrawCylinder(Vector3 position, float radiusTop, float radiusBottom, float height, int slices, Color color);
+RLAPI void DrawCylinder(Vector3 position, float radiusTop, float radiusBottom, float height, int sides, Color color);
 RLAPI void DrawCylinderEx(Vector3 startPos, Vector3 endPos, float startRadius, float endRadius, int sides, Color color);
-RLAPI void DrawCylinderWires(Vector3 position, float radiusTop, float radiusBottom, float height, int slices, Color color);
+RLAPI void DrawCylinderWires(Vector3 position, float radiusTop, float radiusBottom, float height, int sides, Color color);
 RLAPI void DrawCylinderWiresEx(Vector3 startPos, Vector3 endPos, float startRadius, float endRadius, int sides, Color color);
-RLAPI void DrawCapsule(Vector3 startPos, Vector3 endPos, float radius, int slices, int rings, Color color);
-RLAPI void DrawCapsuleWires(Vector3 startPos, Vector3 endPos, float radius, int slices, int rings, Color color);
+RLAPI void DrawCapsule(Vector3 startPos, Vector3 endPos, float radius, int rings, int slices, Color color);
+RLAPI void DrawCapsuleWires(Vector3 startPos, Vector3 endPos, float radius, int rings, int slices, Color color);
 RLAPI void DrawPlane(Vector3 centerPos, Vector2 size, Color color);
 RLAPI void DrawRay(Ray ray, Color color);
 RLAPI void DrawGrid(int slices, float spacing);
@@ -1318,8 +1339,8 @@ RLAPI void DrawModelWires(Model model, Vector3 position, float scale, Color tint
 RLAPI void DrawModelWiresEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, Color tint);
 RLAPI void DrawBoundingBox(BoundingBox box, Color color);
 RLAPI void DrawBillboard(Camera camera, Texture2D texture, Vector3 position, float scale, Color tint);
-RLAPI void DrawBillboardRec(Camera camera, Texture2D texture, Rectangle source, Vector3 position, Vector2 size, Color tint);
-RLAPI void DrawBillboardPro(Camera camera, Texture2D texture, Rectangle source, Vector3 position, Vector3 up, Vector2 size, Vector2 origin, float rotation, Color tint);
+RLAPI void DrawBillboardRec(Camera camera, Texture2D texture, Rectangle rec, Vector3 position, Vector2 size, Color tint);
+RLAPI void DrawBillboardPro(Camera camera, Texture2D texture, Rectangle rec, Vector3 position, Vector3 up, Vector2 size, Vector2 origin, float rotation, Color tint);
 
 RLAPI void UploadMesh(Mesh *mesh, bool dynamic);
 RLAPI void UpdateMeshBuffer(Mesh mesh, int index, const void *data, int dataSize, int offset);
@@ -1380,7 +1401,7 @@ RLAPI Sound LoadSound(const char *fileName);
 RLAPI Sound LoadSoundFromWave(Wave wave);
 RLAPI Sound LoadSoundAlias(Sound source);
 RLAPI bool IsSoundValid(Sound sound);
-RLAPI void UpdateSound(Sound sound, const void *data, int sampleCount);
+RLAPI void UpdateSound(Sound sound, const void *data, int frameCount);
 RLAPI void UnloadWave(Wave wave);
 RLAPI void UnloadSound(Sound sound);
 RLAPI void UnloadSoundAlias(Sound alias);

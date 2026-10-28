@@ -152,6 +152,8 @@ Function RaylibConverter.sProcessDefine(ByVal sLine As String, ByRef bShouldPrin
   ' Filter out headers and internal macros
   If InStr(sLine, "RAYLIB_H") > 0 Or InStr(sLine, "RLGL_H") > 0 Or InStr(sLine, "RAYMATH_H") > 0 Or InStr(sLine, "RAYGUI_H") > 0 Then Return ""
   If InStr(sLine, "_VERSION") > 0 Then Return ""
+  If InStr(sLine, "GUI_") > 0 Then Return ""
+  If (bIsRlgl Or bIsRaymath Or bIsRaygui) And InStr(sLine, "BLANK") > 0 Then Return ""
   If InStr(sLine, "RLAPI") > 0 Or InStr(sLine, "RMAPI") > 0 Or InStr(sLine, "RAYGUIAPI") > 0 Then Return ""
   If InStr(sLine, "__declspec") > 0 Then Return ""
   If InStr(sLine, "defined") > 0 Then Return ""
@@ -278,7 +280,7 @@ Function RaylibConverter.sProcessStruct(ByVal iFileNum As Integer, ByVal sHeader
   ' Skip duplicate structs in sub-libs
   If (bIsRlgl Or bIsRaymath Or bIsRaygui) Then
     If sName = "Matrix" Or sName = "Vector2" Or sName = "Vector3" Or sName = "Vector4" Or sName = "Quaternion" Or _
-       sName = "RayColor" Or sName = "Rectangle" Or sName = "Texture2D" Or sName = "Image" Or sName = "GlyphInfo" Or sName = "Font" Then
+       sName = "RayColor" Or sName = "Rectangle" Or sName = "Texture" Or sName = "Texture2D" Or sName = "Image" Or sName = "GlyphInfo" Or sName = "Font" Then
       ' Skip until brace close
       Dim sDump As String
       Do
@@ -727,22 +729,20 @@ Sub RaylibConverter.Convert(ByVal sInputPath As String, ByVal sOutputPath As Str
     Print #iOut, "  #inclib ""shell32"""
     Print #iOut, "  #inclib ""opengl32"""
     Print #iOut, ""
-    Print #iOut, "  #ifndef __FB_64BIT__"
-    Print #iOut, "    ' Compatibilidad de Linker 32-bit (FBC32 antiguo vs MinGW-w64 moderno)"
-    Print #iOut, "    ' Evita error durante la vinculacion: undefined reference to 'stat64i32'"
-    Print #iOut, "    #ifndef RAYLIB_DISABLE_STAT_FIX"
-    Print #iOut, "    #ifndef RAYLIB_STAT_FIX_APPLIED"
-    Print #iOut, "    #define RAYLIB_STAT_FIX_APPLIED"
-    Print #iOut, "    extern ""C"""
-    Print #iOut, "      function _stat64i32_wrapper cdecl alias ""_stat64i32"" (byval path as any ptr, byval buffer as any ptr) as long"
-    Print #iOut, "        return -1"
-    Print #iOut, "      end function"
-    Print #iOut, "      function stat64i32_wrapper cdecl alias ""stat64i32"" (byval path as any ptr, byval buffer as any ptr) as long"
-    Print #iOut, "        return -1"
-    Print #iOut, "      end function"
-    Print #iOut, "    end extern"
-    Print #iOut, "    #endif"
-    Print #iOut, "    #endif"
+    Print #iOut, "  ' Compatibilidad de Linker (FBC antiguo vs MinGW-w64 moderno)"
+    Print #iOut, "  ' Evita error durante la vinculacion: undefined reference to 'stat64i32'"
+    Print #iOut, "  #ifndef RAYLIB_DISABLE_STAT_FIX"
+    Print #iOut, "  #ifndef RAYLIB_STAT_FIX_APPLIED"
+    Print #iOut, "  #define RAYLIB_STAT_FIX_APPLIED"
+    Print #iOut, "  extern ""C"""
+    Print #iOut, "    function _stat64i32_wrapper cdecl alias ""_stat64i32"" (byval path as any ptr, byval buffer as any ptr) as long"
+    Print #iOut, "      return -1"
+    Print #iOut, "    end function"
+    Print #iOut, "    function stat64i32_wrapper cdecl alias ""stat64i32"" (byval path as any ptr, byval buffer as any ptr) as long"
+    Print #iOut, "      return -1"
+    Print #iOut, "    end function"
+    Print #iOut, "  end extern"
+    Print #iOut, "  #endif"
     Print #iOut, "  #endif"
     Print #iOut, "#endif"
   End If
@@ -812,7 +812,7 @@ Sub RaylibConverter.Convert(ByVal sInputPath As String, ByVal sOutputPath As Str
         Dim sPrev As String = sRemoveLastWord(sReplace(sLine, ";", ""))
         
         ' Skip duplicate aliases for common types
-        If (bIsRlgl Or bIsRaymath Or bIsRaygui) And (sName = "Matrix" Or sName = "Vector2" Or sName = "Vector3" Or sName = "Vector4" Or sName = "Quaternion" Or sName = "Texture2D" Or sName = "Image" Or sName = "GlyphInfo" Or sName = "Font" Or sName = "Color" Or sName = "Rectangle") Then Continue Do
+        If (bIsRlgl Or bIsRaymath Or bIsRaygui) And (sName = "Matrix" Or sName = "Vector2" Or sName = "Vector3" Or sName = "Vector4" Or sName = "Quaternion" Or sName = "Texture" Or sName = "Texture2D" Or sName = "Image" Or sName = "GlyphInfo" Or sName = "Font" Or sName = "Color" Or sName = "Rectangle") Then Continue Do
         
         If Right(sPrev, Len(sName)) = sName Then
           Print #iOut, "type " + sName + " as " + sName
